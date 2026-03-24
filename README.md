@@ -21,7 +21,7 @@
   gitee仓库  [https://gitee.com/su88/68paper-check.git](https://gitee.com/su88/68paper-check.git)
 
 # 技术框架
- 后端采用ThinkPHP8, 管理前端采用Vue3, 售卖前端采用Vue3  
+ 后端采用ThinkPHP8, 管理前端采用Vue3 element-plus, 售卖前端采用Vue3 element-plus 
  数据库使用MySQL5.7  
  支付借用了 yansongda/pay  
  报告存储，支持本地存储、腾讯云COS、阿里云OSS

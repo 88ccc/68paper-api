@@ -8,7 +8,7 @@ use app\service\ConfigService;
 class Check
 {
 
-    private $baseUrl = "https://api.88xuezi.com/api/";
+    private $baseUrl = "https://ck.88xuezi.cn/api/";
     /**
      * 生成签名
      */

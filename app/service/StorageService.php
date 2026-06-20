@@ -85,6 +85,15 @@ class StorageService
                 $type = 3;
             }
         }
+
+        $path = runtime_path() .  '/report/' . $time;
+        $path1 = runtime_path() .  '/report/' . $time1;
+        try {
+            $this->deleteDirectory($path);
+            $this->deleteDirectory($path1);
+        } catch (Exception $e) {
+            // 捕获异常并输出错误信息
+        }
         if ($type == 1) {
             $path = public_path() .  '/report/' . $time;
             $path1 = public_path() .  '/report/' . $time1;
@@ -119,12 +128,6 @@ class StorageService
         // 3. 验证路径是否为目录
         if (!is_dir($dirPath)) {
             throw new Exception("指定路径不是文件夹：{$dirPath}");
-        }
-
-        // 4. 安全校验：限制删除范围（可选，防止误删系统目录）
-        $allowedBaseDir = '/www/wwwroot/data/';
-        if (strpos($dirPath, $allowedBaseDir) !== 0) {
-            throw new Exception("禁止删除非授权目录：{$dirPath}");
         }
 
         // 5. 递归删除文件夹内的所有内容

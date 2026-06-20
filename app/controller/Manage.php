@@ -4,6 +4,8 @@ namespace app\controller;
 
 use app\BaseController;
 use app\model\AdminModel;
+use app\model\ArticleModel;
+use app\model\AttachModel;
 use app\service\ConfigService;
 use app\service\WxPublicService;
 use think\facade\Log;
@@ -11,14 +13,14 @@ use app\model\PayModeModel;
 use app\model\PaySetModel;
 use app\supplier\Check as CheckSupplier;
 use app\model\CheckModel;
-use app\model\ShopModel;
-use app\model\ShopProductModel;
-use think\exception\FileException;
 use app\model\CheckOrderModel;
+use app\model\UserModel;
+use app\model\WithdrawModel;
 use app\service\PayService;
 
 class  Manage extends BaseController
 {
+    private $is_test = false; ////是否是演示平台  正式使用时应该设置为false
     public function adminInfo()
     {
         $userid = $this->request->userid;
@@ -60,6 +62,12 @@ class  Manage extends BaseController
 
     public function setStorageConfig()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
         $storageType = $this->request->param('storageType');
         if ($storageType == 'local') {
             ConfigService::set('storage', [
@@ -94,6 +102,12 @@ class  Manage extends BaseController
 
     public function setCustomConfig()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
         $file = request()->file('file');
         if (empty($file)) {
             return json([
@@ -130,6 +144,12 @@ class  Manage extends BaseController
 
     public function clearWxPublicConfig()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
         ConfigService::clear('wxpublic');
         return json([
             'code' => 0,
@@ -146,6 +166,15 @@ class  Manage extends BaseController
                 'msg' => '请先配置微信信息'
             ]);
         } else {
+            if ($this->is_test) {
+                //演示网站
+                if (!empty($config['appid'])) {
+                    $config['appid'] = 'wx5185******89';
+                }
+                if (!empty($config['appSecret'])) {
+                    $config['appSecret'] = 'fb17b*********661e28e';
+                }
+            }
             return json([
                 'code' => 0,
                 'data' => $config
@@ -155,6 +184,12 @@ class  Manage extends BaseController
 
     public function setWxPublicConfig()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
         $config = $this->request->param('config');
         if (empty($config)) {
             return json([
@@ -172,6 +207,12 @@ class  Manage extends BaseController
 
     public function setPayMode()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
         $id = $this->request->post('id');
         $type = $this->request->post('type');
         $name = $this->request->post('name');
@@ -531,7 +572,19 @@ class  Manage extends BaseController
     {
         $list["code"] = 0;
         $list["count"] = 0;
-        $list["msg"] = "暂无数据";
+        $list["msg"] = "";
+        $count = PayModeModel::count();
+        $users = PayModeModel::field('id,name,type,appid,mchid,create_time,update_time')->order('create_time', 'desc')->select();
+        $list["count"] = $count;
+        $list["data"] = $users;
+        return json($list);
+    }
+
+    public function getPayMode()
+    {
+        $list["code"] = 0;
+        $list["count"] = 0;
+        $list["msg"] = "";
 
         $page = input("get.page") ? input("get.page") : 1;
         $page = intval($page);
@@ -539,13 +592,25 @@ class  Manage extends BaseController
         $limit = intval($limit);
         $start = $limit * ($page - 1);
         $count = PayModeModel::count();
-        $users = PayModeModel::order('create_time', 'desc')->limit($start, $limit)->select();
+        $users = PayModeModel::field('id,name,type,appid,mchid,create_time,update_time')->order('create_time', 'desc')->limit($start, $limit)->select();
         $list["count"] = $count;
         $list["data"] = $users;
         return json($list);
     }
     public function deletePayMode()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
         $id = input("post.id");
         if (empty($id)) {
             return json([
@@ -614,6 +679,12 @@ class  Manage extends BaseController
     }
     public function setPaySet()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
         $data = input("post.data");
         try {
             $ret = PaySetModel::saveAll($data);
@@ -657,6 +728,12 @@ class  Manage extends BaseController
 
     public function editAdmin()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
         $id = input("post.id");
         if (empty($id)) {
             return json([
@@ -733,6 +810,12 @@ class  Manage extends BaseController
 
     public function setCheckKeyConfig()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
         $config = $this->request->param('config');
         if (empty($config)) {
             return json([
@@ -755,6 +838,12 @@ class  Manage extends BaseController
                 'msg' => '请先配置检测秘钥'
             ]);
         } else {
+            if ($this->is_test) {
+                if (!empty($config['key'])) {
+                    $config['key'] = 'fb45d*******986c2';
+                }
+            }
+
             return json([
                 'code' => 0,
                 'msg' => '',
@@ -764,6 +853,12 @@ class  Manage extends BaseController
     }
     public function clearCheckKeyConfig()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
         ConfigService::clear('checkkey');
         return json([
             'code' => 0,
@@ -802,8 +897,25 @@ class  Manage extends BaseController
             $mycheck->id = $check['id'];
             $mycheck->name = $check['name'];
             $mycheck->cost = $check['price'];
+            if (empty($mycheck->price)) {
+                $mycheck->price = $check['price'];
+            } else {
+                if ($mycheck->price < $check['price']) {
+                    $mycheck->price = $check['price'];
+                }
+            }
             $mycheck->unit = $check['unit'];
-            $mycheck->mini_price = $check['mini_price'];
+            $mycheck->low_price = $check['mini_price'];
+            if (empty($mycheck->mini_price)) {
+                $mycheck->mini_price = $check['mini_price'];
+            } else {
+                if ($mycheck->mini_price < $check['mini_price']) {
+                    $mycheck->mini_price = $check['mini_price'];
+                }
+            }
+            if (empty($mycheck->remark)) {
+                $mycheck->remark = $check['remark'];
+            }
             $mycheck->supplier_status = $check['status'];
             $mycheck->config = $check['config'];
             $mycheck->update_time = $now;
@@ -826,10 +938,6 @@ class  Manage extends BaseController
     {
         $list["code"] = 0;
         $list["msg"] = "";
-        $type = input("get.type");
-        if (empty($type)) {
-            $type = 0;
-        }
         $page = input("get.page") ? input("get.page") : 1;
         $limit = input("get.limit") ? input("get.limit") : 1;
         $page = intval($page);
@@ -842,25 +950,7 @@ class  Manage extends BaseController
         return json($list);
     }
 
-    public function desableCheckProduct()
-    {
-        $id = $this->request->post("id");
-        CheckModel::where('id', $id)->update(['status' => 2]);
-        return json([
-            'code' => 0,
-            'msg' => '',
-        ]);
-    }
 
-    public function enableCheckProduct()
-    {
-        $id = $this->request->post("id");
-        CheckModel::where('id', $id)->update(['status' => 1]);
-        return json([
-            'code' => 0,
-            'msg' => '',
-        ]);
-    }
     public function deleteCheckProduct()
     {
         $id = $this->request->post("id");
@@ -871,431 +961,7 @@ class  Manage extends BaseController
         ]);
     }
 
-    public function addShop()
-    {
-        $id = $this->request->post("id");
-        $name = $this->request->post("name");
-        if (empty($id)) {
-            return json([
-                'code' => 1,
-                'msg' => '店铺id必填写'
-            ]);
-        }
-        $id = trim($id);
-        $idlen = strlen($id);
-        if ($idlen > 64 || $idlen < 1) {
-            return json([
-                'code' => 1,
-                'msg' => 'id的长度不得超过64'
-            ]);
-        }
-        $pattern = '/^[a-z0-9]{1,64}$/';
-        if (preg_match($pattern, $id) !== 1) {
-            return json([
-                'code' => 1,
-                'msg' => '店铺ID仅支持小写字母和数字'
-            ]);
-        }
-        if (empty($name)) {
-            return json([
-                'code' => 1,
-                'msg' => '店铺名称不能为空'
-            ]);
-        }
-        $name = trim($name);
-        $shop = ShopModel::where('id', $id)->find();
-        if (!empty($shop)) {
-            return json([
-                'code' => 1,
-                'msg' => '店铺已经存在'
-            ]);
-        }
-        $shop = new ShopModel();
-        $shop->id = $id;
-        $shop->name = $name;
-        $shop->status = 1;
-        $now = date('Y-m-d H:i:s', time());
-        $shop->create_time = $now;
-        $shop->update_time = $now;
-        $shop->save();
-        return json([
-            'code' => 0,
-            'msg' => ''
-        ]);
-    }
 
-    public function enableShop()
-    {
-        $id = $this->request->post("id");
-        ShopModel::where('id', $id)->update(['status' => 1]);
-        return json([
-            'code' => 0,
-            'msg' => '',
-        ]);
-    }
-    public function desableShop()
-    {
-        $id = $this->request->post("id");
-        ShopModel::where('id', $id)->update(['status' => 2]);
-        return json([
-            'code' => 0,
-            'msg' => '',
-        ]);
-    }
-
-    public function deleteShop()
-    {
-        $id = $this->request->post("id");
-        ShopModel::where('id', $id)->delete();;
-        return json([
-            'code' => 0,
-            'msg' => '',
-        ]);
-    }
-    public function getShopData()
-    {
-        $list["code"] = 0;
-        $list["msg"] = "";
-        $type = input("get.type");
-        if (empty($type)) {
-            $type = 0;
-        }
-        $page = input("get.page") ? input("get.page") : 1;
-        $limit = input("get.limit") ? input("get.limit") : 1;
-        $page = intval($page);
-        $limit = intval($limit);
-        $start = $limit * ($page - 1);
-        $count = ShopModel::count();
-        $products = ShopModel::limit($start, $limit)->select();
-        $list["count"] = $count;
-        $list["data"] = $products;
-        return json($list);
-    }
-
-    public function getShopInfo()
-    {
-        $shopid = $this->request->post("shopid");
-        $shop = ShopModel::where('id', $shopid)->find();
-        if (empty($shop)) {
-            return json([
-                'code' => 1,
-                'msg' => '没有找到该店铺',
-            ]);
-        }
-        return json([
-            'code' => 0,
-            'msg' => '',
-            'data' => $shop,
-        ]);
-    }
-
-    public function uploadShopFile()
-    {
-        $shopid = $this->request->post("shopid");
-        //查看这个店铺
-        $shop = ShopModel::where('id', $shopid)->find();
-        if (empty($shop)) {
-            return json([
-                'code' => 1,
-                'msg' => '找不到这个店铺',
-            ]);
-        }
-        //获取文件信息
-        $file = $this->request->file('file');
-        if (empty($file)) {
-            return json([
-                'code' => 1,
-                'msg' => '未上传文件',
-            ]);
-        }
-        //判断文件类型，只支持pdf
-        $file_ex = $file->getOriginalExtension();
-        $file_name = $file->getOriginalName();
-        $file_size = $file->getSize();
-        if (strcmp($file_ex, 'pdf') != 0) {
-            $list['code'] = 1;
-            $list['msg'] = '仅支持后缀为pdf的文件';
-            return json($list);
-        }
-
-        if (!(preg_match("/^[a-zA-Z0-9_\x{4e00}-\x{9fa5}]+\.pdf$/u", $file_name))) {
-            $list['code'] = 2;
-            $list['msg'] = '文件名只能是中文、大小写字母、数字和下划线，例如 查重秘籍_abcDEF_123.pdf';
-            return json($list);
-        }
-        if ($file_size > 2097152) {
-            //2M 2 X 1024 X 1024
-            $list['code'] = 1;
-            $list['msg'] = '文件大小不得超过2M';
-            return json($list);
-        }
-        $save_name = $shopid . '.pdf';
-        //保存路劲
-        $path = runtime_path() . '/shop_file/';
-        if (!file_exists($path)) {
-            $ret = mkdir($path, 0777, true);
-            if ($ret === false) {
-                Log::error("uploadShopFile 创建文件夹失败 " . $path);
-                $list['code'] = 1;
-                $list['msg'] = '系统异常，无法创建路径';
-                return json($list);
-            }
-        }
-        try {
-            $file->move($path, $save_name);
-            $now = date('Y-m-d H:i:s', time());
-            ShopModel::where('id', $shopid)->update(['file_name' => $file_name, 'file_path' => $path . $save_name]);
-            $list['code'] = 0;
-            $list['msg'] = '上传成功,';
-            $list['data'] = [
-                "file_name" => $file_name
-            ];
-            return json($list);
-        } catch (FileException $e) {
-            $list['code'] = 1;
-            $list['msg'] = '保存失败';
-            return json($list);
-        }
-    }
-    public function deleteShopFile()
-    {
-        $shopid = $this->request->post("shopid");
-        $path = runtime_path() . '/shop_file/' . $shopid . ".pdf";
-        if (file_exists($path)) {
-            unlink($path);
-        }
-        ShopModel::where('id', $shopid)->update(['file_name' => '', 'file_path' => '']);
-        return json([
-            'code' => 0,
-            'msg' => ''
-        ]);
-    }
-
-    public function syncShopProduct()
-    {
-        $shopid = $this->request->post("shopid");
-        if (empty($shopid)) {
-            return json([
-                'code' => 1,
-                'msg' => '店铺id不能为空'
-            ]);
-        }
-        $shop = ShopModel::where('id', $shopid)->find();
-        if (empty($shop)) {
-            return json([
-                'code' => 1,
-                'msg' => '店铺不存在'
-            ]);
-        }
-        $ids = [];
-        $checks = CheckModel::select();
-        foreach ($checks as $check) {
-
-            $ids[] = $check['id'];
-            $product = ShopProductModel::where(['shopid' => $shopid, 'productid' => $check['id']])->find();
-            if (empty($product)) {
-                $now = date('Y-m-d H:i:s', time());
-                $product = new ShopProductModel();
-                $product->shopid = $shopid;
-                $product->productid = $check['id'];
-                $product->unit = $check['unit'];
-                $product->price = $check['mini_price'];
-                $product->status = 1;
-                $product->create_time = $now;
-                $product->update_time = $now;
-                $product->save();
-            } else {
-                $b = 1;
-                $checked = false;
-                //检查价格
-                if ($check['unit'] == 0) {
-                    //product unit必须等于0
-                    if ($product->unit != 0) {
-                        $product->unit = 0;
-                        $product->price = $check['mini_price'];
-                        $product->save();
-                        $checked = true;
-                    }
-                } else if ($product->unit < $check['unit']) {
-                    $product->unit = $check['unit'];
-                    $product->price = $check['mini_price'];
-                    $product->save();
-                    $checked = true;
-                } else {
-                    $remainder = bcmod($product->unit, $check['unit'], 0);
-                    if ($remainder != 0) {
-                        $product->unit = $check['unit'];
-                        $product->price = $check['mini_price'];
-                        $product->save();
-                        $checked = true;
-                    } else {
-                        $b = bcdiv($product->unit, $check['unit'], 0);
-                    }
-                }
-
-                //比较价格
-                if (!$checked) {
-                    $cost = bcmul($check['cost'], $b, 0);
-                    if ($cost > $product->price) {
-                        $product->unit = $check['unit'];
-                        $product->price = $check['mini_price'];
-                        $product->save();
-                    }
-                    $min = bcmul($check['mini_price'], $b, 0);
-                    if ($min > $product->price) {
-                        $product->unit = $check['unit'];
-                        $product->price = $check['mini_price'];
-                        $product->save();
-                    }
-                }
-            }
-        }
-
-        $allProduct = ShopProductModel::where("shopid", $shopid)->field(['productid'])->select();
-        foreach ($allProduct as $product) {
-            if (!in_array($product['productid'], $ids)) {
-                CheckModel::where(['shopid' => $shopid, 'productid' => $product['productid']])->delete();
-            }
-        }
-        return json([
-            'code' => 0,
-            'msg' => ''
-        ]);
-    }
-
-    public function getShopProductData()
-    {
-        $list["code"] = 0;
-        $list["msg"] = "";
-        $list["count"] = 0;
-        $shopid = input("get.shopid") ? input("get.shopid") : "";
-        if (empty($shopid)) {
-            return json($list);
-        }
-        $page = input("get.page") ? input("get.page") : 1;
-        $page = intval($page);
-        $limit = input("get.limit") ? input("get.limit") : 1;
-        $limit = intval($limit);
-        $start = $limit * ($page - 1);
-        $count = ShopProductModel::where("shopid", $shopid)->count();
-        $users = ShopProductModel::where("shopid", $shopid)->limit($start, $limit)->select();
-        $list["count"] = $count;
-        $list["data"] = $users;
-        return json($list);
-    }
-
-    public function editShopProduct()
-    {
-        $shopid = $this->request->post('shopid');
-        $productid = $this->request->post("productid");
-        $status = $this->request->post("status");
-        $unit = $this->request->post("unit");
-        $price = $this->request->post("price");
-        $check = CheckModel::where('id', $productid)->find();
-        $tips = $this->request->post("tips");
-        if (empty($tips)) {
-            $tips = "";
-        } else {
-            $tips = trim($tips);
-        }
-
-        $unit = intval($unit);
-        $price = intval($price);
-        $status = intval($status);
-        if (($status != 1) && ($status != 2)) {
-            return json([
-                'code' => 1,
-                'msg' => '状态不合法',
-            ]);
-        }
-
-        if (empty($check)) {
-            return json([
-                'code' => 1,
-                'msg' => '该货源不存在',
-            ]);
-        }
-        $product = ShopProductModel::where(['shopid' => $shopid, 'productid' => $productid])->find();
-        if (empty($product)) {
-            return json([
-                'code' => 1,
-                'msg' => '该产品不存在',
-            ]);
-        }
-        //检查价格
-        if ($check['unit'] == 0) {
-            //product unit必须等于0
-            if ($unit != 0) {
-                return json([
-                    'code' => 1,
-                    'msg' => '计费单位必须为0',
-                ]);
-            }
-        }
-        if (($check['unit'] != 0) && ($unit == 0)) {
-            return json([
-                'code' => 1,
-                'msg' => '计费单位不能为0',
-            ]);
-        }
-        if ($unit < $check['unit']) {
-            return json([
-                'code' => 1,
-                'msg' => '计费单位必须大于' . $check['unit'] . "因为货源的计费单位是" . $check['unit'],
-            ]);
-        } else {
-            $remainder = 0;
-            if ($unit != 0) {
-                $remainder = bcmod($product->unit, $check['unit'], 0);
-            }
-
-            if ($remainder != 0) {
-                return json([
-                    'code' => 1,
-                    'msg' => '计费单位必须是' . $check['unit'] . "的整数倍,因为货源的计费单位是" . $check['unit'],
-                ]);
-            } else {
-                //比较价格
-                $cost = $check['cost'];
-                if ($unit != 0) {
-                    $b = bcdiv($unit, $check['unit'], 0);
-                    $cost = bcmul($check['cost'], $b, 0);
-                }
-
-                if ($cost > $price) {
-                    return json([
-                        'code' => 1,
-                        'msg' => '这个售价会亏本',
-                    ]);
-                }
-                //比较最低售价
-                $min = $check['mini_price'];
-
-
-                if ($unit != 0) {
-                    $b = bcdiv($unit, $check['unit'], 0);
-                    $min = bcmul($check['mini_price'], $b, 0);
-                }
-                $min100 = bcdiv($check['mini_price'], 100, 2);
-                $smsg = "" . $min100 . "元/次";
-                if ($unit != 0) {
-                    $smsg = "" . $min100 . "元/" . $check['unit'] . "字符";
-                }
-                if ($min > $price) {
-                    return json([
-                        'code' => 1,
-                        'msg' => '必须高于规定的最低售价' . $smsg,
-                    ]);
-                }
-            }
-        }
-        //合规
-        ShopProductModel::where(['shopid' => $shopid, 'productid' => $productid])->update(['status' => $status, 'unit' => $unit, 'price' => $price, 'tips' => $tips, 'update_time' => date('Y-m-d H:i:s', time())]);
-        return json([
-            'code' => 0,
-            'msg' => ''
-        ]);
-    }
 
     public function getCheckOrderData()
     {
@@ -1335,6 +1001,12 @@ class  Manage extends BaseController
 
     public function orderRefund()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
         $orderid = $this->request->post("orderid");
         $order = CheckOrderModel::where('id', $orderid)->find();
         if (empty($order)) {
@@ -1357,7 +1029,6 @@ class  Manage extends BaseController
         }
         $ret  = (new PayService())->refund($order->payid);
         if ($ret['code'] == 0) {
-            CheckOrderModel::where(["id" => $order->id])->update(["status" => 9, "update_time" => date('Y-m-d H:i:s')]);
             return json([
                 'code' => 0,
                 'msg' => "退款成功"
@@ -1426,6 +1097,783 @@ class  Manage extends BaseController
                 "dates" => array_keys($payDateRange),
                 'pay' => array_values($payDateRange)
             ]
+        ]);
+    }
+
+    public function clearEmailConfig()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        ConfigService::clear('email');
+        return json([
+            'code' => 0,
+            'msg' => '清空成功'
+        ]);
+    }
+
+    public function setWithdrawConfig()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $config = $this->request->param('config');
+        if (empty($config)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写提现配置'
+            ]);
+        }
+        ConfigService::set('withdraw', $config, '提现配置');
+        return json([
+            'code' => 0,
+            'msg' => '设置成功'
+        ]);
+    }
+
+    public function getEmailConfig()
+    {
+        $config = ConfigService::get("email");
+        if (empty($config)) {
+            return json([
+                'code' => 10000,
+                'msg' => '请先配置邮件信息'
+            ]);
+        } else {
+            if($this->is_test){
+                if(!empty($config['password'])){
+                    $config['password']="********";
+                }
+            }
+            return json([
+                'code' => 0,
+                'msg' => '',
+                'data' => $config
+            ]);
+        }
+    }
+    public function setEmailConfig()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $config = $this->request->param('config');
+        if (empty($config)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写邮件配置'
+            ]);
+        }
+        ConfigService::set('email', $config, '邮件配置');
+        return json([
+            'code' => 0,
+            'msg' => '设置成功'
+        ]);
+    }
+    public function clearSmsConfig()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        ConfigService::clear('sms');
+        return json([
+            'code' => 0,
+            'msg' => '清空成功'
+        ]);
+    }
+
+    public function getSmsConfig()
+    {
+        $config = ConfigService::get("sms");
+        if (empty($config)) {
+            return json([
+                'code' => 10000,
+                'msg' => '请先配置短信信息'
+            ]);
+        } else {
+            if($this->is_test){
+                if(!empty($config['ali']['accessKeyId'])){
+                    $config['ali']['accessKeyId']="********";
+                }
+                if(!empty($config['ali']['accessKeySecret'])){
+                    $config['ali']['accessKeySecret']="********";
+                }
+                if(!empty($config['tencent']['accessKeyId'])){
+                    $config['tencent']['accessKeyId']="********";
+                }
+                if(!empty($config['tencent']['accessKeySecret'])){
+                    $config['tencent']['accessKeySecret']="********";
+                }
+                if(!empty($config['tencent']['signature'])){
+                    $config['tencent']['signature']="********";
+                }
+            }
+            return json([
+                'code' => 0,
+                'msg' => '',
+                'data' => $config
+            ]);
+        }
+    }
+    public function setSmsConfig()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $smsType = $this->request->param('smsType');
+        if ($smsType == 'ali') {
+            $aliConfig = $this->request->param('aliConfig');
+            ConfigService::set('sms', [
+                'smsType' => $smsType,
+                'ali' => $aliConfig
+            ], '短信配置');
+        } else if ($smsType == 'tencent') {
+            $tencentConfig = $this->request->param('tencentConfig');
+            ConfigService::set('sms', [
+                'smsType' => $smsType,
+                'tencent' => $tencentConfig
+            ], '短信配置');
+        } else {
+            return json([
+                'code' => 1,
+                'msg' => '短信引擎错误'
+            ]);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '设置成功'
+        ]);
+    }
+    public function setLoginRegisterConfig()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $regList = $this->request->param('regList');
+        ConfigService::set('loginRegister', [
+            'regList' => $regList,
+        ], '登录注册配置');
+        return json([
+            'code' => 0,
+            'msg' => '设置成功'
+        ]);
+    }
+
+    public function getUserData()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $qid = input("get.id");
+        $qstatus = input("get.status");
+        $qmobile = input("get.mobile");
+        $qemail = input("get.email");
+        $where = [];
+        if (!empty($qid)) {
+            $where['id'] = $qid;
+        }
+        if (!empty($qstatus)) {
+            $where['status'] = $qstatus;
+        }
+        if (!empty($qmobile)) {
+            $where['mobile'] = $qmobile;
+        }
+        if (!empty($qemail)) {
+            $where['email'] = $qemail;
+        }
+        $page = input("get.page") ? input("get.page") : 1;
+        $page = intval($page);
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = UserModel::where($where)->count();
+        $users = UserModel::where($where)->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $users;
+        return json($list);
+    }
+
+    //修改用户状态
+    public function editUserStatus()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $data = request()->post();
+        if (empty($data)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写用户信息'
+            ]);
+        }
+        if (!isset($data['id'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写用户ID'
+            ]);
+        }
+        if (!isset($data['status'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写用户状态'
+            ]);
+        }
+        if ($data['status'] != 0 && $data['status'] != 1 && $data['status'] != 2) {
+            return json([
+                'code' => 1,
+                'msg' => '不支持的用户状态'
+            ]);
+        }
+        $remark = "";
+        if (isset($data['remark'])) {
+            $remark = $data['remark'];
+        }
+
+        UserModel::where('id', $data['id'])->update(['status' => $data['status'],  'tips' => $remark]);
+        return json([
+            'code' => 0,
+            'msg' => '成功'
+        ]);
+    }
+    //修改用户金额
+    public function editUserBalance()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $data = request()->post();
+        if (empty($data)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写用户信息'
+            ]);
+        }
+        if (!isset($data['id'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写用户ID'
+            ]);
+        }
+        if (!isset($data['amount'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写amount'
+            ]);
+        }
+        $remark = "管理员操作";
+        if (isset($data['remark'])) {
+            $remark = $data['remark'];
+        }
+        $amount = intval($data['amount']);
+        if ($amount == 0) {
+            return json([
+                'code' => 0,
+                'msg' => '成功'
+            ]);
+        }
+        if (!isset($data['type'])) {
+            return json([
+                'code' => 1,
+                'msg' => '类型必须填入'
+            ]);
+        }
+        $type = intval($data['type']);
+        if ($type == 0) {
+            return json([
+                'code' => 1,
+                'msg' => '类型必须填入'
+            ]);
+        }
+        $user = UserModel::where('id', $data['id'])->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => '用户不存在'
+            ]);
+        }
+        if ($amount < 0) {
+            $p = abs($amount);
+            $ret = $user->decreaseBalance($p, $type, "",  $remark, 0, 2);
+            if ($ret) {
+                return json([
+                    'code' => 0,
+                    'msg' => '成功'
+                ]);
+            } else {
+                return json([
+                    'code' => 1,
+                    'msg' => '失败'
+                ]);
+            }
+        } else {
+            $p = abs($amount);
+            $ret = $user->increaseBalance($p, $type, "", $remark, 0, 2);
+            if ($ret) {
+                return json([
+                    'code' => 0,
+                    'msg' => '成功'
+                ]);
+            } else {
+                return json([
+                    'code' => 1,
+                    'msg' => '失败'
+                ]);
+            }
+        }
+    }
+
+    //修改用户姓名
+    public function editUserName()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $data = request()->post();
+        if (empty($data)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写用户信息'
+            ]);
+        }
+        if (!isset($data['id'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写用户ID'
+            ]);
+        }
+        $name = "";
+        if (!isset($data['name'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写用户姓名'
+            ]);
+        } else {
+            $name = trim($data['name']);
+            if (empty($name)) {
+                return json([
+                    'code' => 1,
+                    'msg' => '请填写用户姓名'
+                ]);
+            }
+        }
+        UserModel::where('id', $data['id'])->update(['name' => $name]);
+        return json([
+            'code' => 0,
+            'msg' => '成功'
+        ]);
+    }
+
+    public function updateCheckProduct()
+    {
+        $data = request()->post();
+        if (empty($data)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写信息'
+            ]);
+        }
+        if (!isset($data['id'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写ID'
+            ]);
+        }
+        $check = CheckModel::where('id', $data['id'])->find();
+        if (empty($check)) {
+            return json([
+                'code' => 1,
+                'msg' => '找不到这个产品'
+            ]);
+        }
+        $price = 0;
+        if (empty($data['price'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写供货价'
+            ]);
+        } else {
+            $price = intval($data['price']);
+        }
+        $mini_price = 0;
+        if (empty($data['mini_price'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写最低零售价'
+            ]);
+        } else {
+            $mini_price = intval($data['mini_price']);
+        }
+        if ($price <= 0 || $mini_price <= 0) {
+            return json([
+                'code' => 1,
+                'msg' => '价格不能小于等于0'
+            ]);
+        }
+        if ($mini_price < $price) {
+            return json([
+                'code' => 1,
+                'msg' => '最低零售价不能小于供货价'
+            ]);
+        }
+        if ($mini_price < $check->low_price) {
+            return json([
+                'code' => 1,
+                'msg' => '最低零售价不能小于88学子规定的最低零售价'
+            ]);
+        }
+        if ($price < $check->cost) {
+            return json([
+                'code' => 1,
+                'msg' => '供货价不能小于成本价'
+            ]);
+        }
+        if (empty($data['remark'])) {
+            $remark = "";
+        } else {
+            $remark = trim($data['remark']);
+        }
+        if (empty($data['status'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写状态'
+            ]);
+        }
+        $status = intval($data['status']);
+        if ($status != 1 && $status != 2) {
+            return json([
+                'code' => 1,
+                'msg' => '状态错误'
+            ]);
+        }
+        CheckModel::where('id', $data['id'])->update(['price' => $price, 'mini_price' => $mini_price, 'status' => $status, 'remark' => $remark, 'update_time' => date('Y-m-d H:i:s')]);
+        return json([
+            'code' => 0,
+            'msg' => '成功'
+        ]);
+    }
+
+    public function getAttachData()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $page = input("get.page") ? input("get.page") : 1;
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $userid = input("get.userid") ? input("get.userid") : '';
+        $status = input("get.status") ? input("get.status") : '';
+        $where = [];
+        if (!empty($userid)) {
+            $where[] = ['userid', '=', $userid];
+        }
+        if (!empty($status)) {
+            $where[] = ['file_status', '=', $status];
+        }
+        $page = intval($page);
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = AttachModel::where($where)->count();
+        $prdate = AttachModel::where($where)->order('userid', 'asc')->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $prdate;
+        return json($list);
+    }
+    public function attachAudit()
+    {
+        $userid = $this->request->post("userid");
+        $status = $this->request->post("status");
+        if (empty($userid)) {
+            return json([
+                'code' => 1,
+                'msg' => '没有userid'
+            ]);
+        }
+        $attach = AttachModel::where("userid", $userid)->find();
+        if (empty($attach)) {
+            return json([
+                'code' => 1,
+                'msg' => "该用户没有附件"
+            ]);
+        }
+        AttachModel::where("userid", $userid)->update(['file_status' => $status, 'update_time' => date('Y-m-d H:i:s')]);
+        return json([
+            'code' => 0,
+            'msg' => ''
+        ]);
+    }
+
+    public function setNotice()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $content = $this->request->post('content');
+        $notice = ArticleModel::where('id', 'notice')->find();
+        if (empty($notice)) {
+            ArticleModel::insert([
+                'id' => 'notice',
+                'content' => $content,
+                'update_time' => date('Y-m-d H:i:s')
+            ]);
+        } else {
+            ArticleModel::where('id', 'notice')->update(['content' => $content, 'update_time' => date('Y-m-d H:i:s')]);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '修改成功'
+        ]);
+    }
+
+    public function getWithdrawList()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $page = input("get.page") ? input("get.page") : 1;
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $userid = input("get.userid") ? input("get.userid") : '';
+        $status = input("get.status") ? input("get.status") : '';
+        $where = [];
+        if (!empty($userid)) {
+            $where[] = ['userid', '=', $userid];
+        }
+        if (!empty($status)) {
+            $where[] = ['status', '=', $status];
+        }
+        $page = intval($page);
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = WithdrawModel::where($where)->count();
+        $prdate = WithdrawModel::where($where)->order('create_time', 'desc')->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $prdate;
+        return json($list);
+    }
+    public function getWithdrawInfo()
+    {
+        $userid =  $this->request->post("userid");
+        $user = UserModel::where("id", $userid)->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => '用户不存在'
+            ]);
+        }
+        //本月提现次数
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => [
+                'balance' => $user->balance,
+                'status' =>  $user->status,
+            ]
+        ]);
+    }
+
+    public function withdrawHandle()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $data =  $this->request->post("");
+        if (empty($data['id'])) {
+            return json([
+                'code' => 1,
+                'msg' => 'id必须填写'
+            ]);
+        }
+        if (empty($data['userid'])) {
+            return json([
+                'code' => 1,
+                'msg' => 'userid必须填写'
+            ]);
+        }
+        $user = UserModel::where('id', $data['userid'])->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => '该用户不存在'
+            ]);
+        }
+        if (($data['charge'] != 0) && (empty($data['charge']))) {
+            return json([
+                'code' => 1,
+                'msg' => 'charge必须填写'
+            ]);
+        }
+        if (($data['amount'] != 0) && (empty($data['amount']))) {
+            return json([
+                'code' => 1,
+                'msg' => 'amount必须填写'
+            ]);
+        }
+        if (empty($data['status'])) {
+            return json([
+                'code' => 1,
+                'msg' => 'status必须填写'
+            ]);
+        }
+        $remark = "";
+        if (!empty($data['remark'])) {
+            $remark = trim($data['remark']);
+        }
+        $withdraw =  WithdrawModel::where('id', $data['id'])->find();
+        if (empty($withdraw)) {
+            return json([
+                'code' => 1,
+                'msg' => '找不到该提现记录'
+            ]);
+        }
+        if ($withdraw->userid != $data['userid']) {
+            return json([
+                'code' => 1,
+                'msg' => '该提现记录的userid不对'
+            ]);
+        }
+        $status = intval($data['status']);
+        $amount = intval($data['amount']);
+        $charge = intval($data['charge']);
+        if (($amount + $charge) != $withdraw->money) {
+            return json([
+                'code' => 1,
+                'msg' => '到账金额加手续费不等于提现金额'
+            ]);
+        }
+        if ($user->balance < $withdraw->money) {
+            return json([
+                'code' => 1,
+                'msg' => '用户余额不足'
+            ]);
+        }
+        if ($status != 1 && $status != 2 && $status != 3) {
+            return json([
+                'code' => 1,
+                'msg' => 'status错误'
+            ]);
+        }
+        if ($status != $withdraw->status) {
+            if ($status == 2) {
+                $ret = $user->decreaseBalance($withdraw->money, 5, $withdraw->id, '');
+                if (!$ret) {
+                    return json([
+                        'code' => 1,
+                        'msg' => '扣除余额失败'
+                    ]);
+                }
+            }
+        }
+        WithdrawModel::where('id', $data['id'])->update(['charge' => $data['charge'], 'amount' => $data['amount'], 'status' => $status, 'remark' => $remark, 'do_time' => date('Y-m-d H:i:s')]);
+        return json([
+            'code' => 0,
+            'msg' => '成功'
+        ]);
+    }
+    public function setWebsiteConfig()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $webName = $this->request->param('webName');
+        $files = request()->file();
+        $iconpath = "";
+        if (isset($files['webLogo']) && (!empty($files['webLogo']))) {
+            //检查文件大小
+            $file = $files['webLogo'];
+            if ($file->getSize() > 1024 * 1024) {
+                return json([
+                    'code' => 1,
+                    'msg' => '网站Logo大小不能超过1M'
+                ]);
+            }
+            //检查文件是否是图片
+            $file_ex = $file->getOriginalExtension();
+            if (!in_array($file_ex, ['jpg', 'png', 'jpeg', 'gif'])) {
+                return json([
+                    'code' => 1,
+                    'msg' => '网站Logo格式错误'
+                ]);
+            }
+            $path = public_path() . '/static/images/';
+            $iconpath = '/static/images/websiteicon.' . $file_ex;
+            try {
+                $file->move($path, 'websiteicon.' . $file_ex);
+            } catch (\Exception $e) {
+                return json([
+                    'code' => 1,
+                    'msg' => '网站Logo上传失败'
+                ]);
+            }
+        }
+        $faviconpath = "";
+        if (isset($files['favicon']) && (!empty($files['favicon']))) {
+            $faviconFile = $files['favicon'];
+
+            //检查文件大小
+            if ($faviconFile->getSize() > 100 * 1024) {
+                return json([
+                    'code' => 1,
+                    'msg' => '网站favicon大小不能超过100K'
+                ]);
+            }
+            //检查文件是否是图片
+            $file_ex = $faviconFile->getOriginalExtension();
+            if (!in_array($file_ex, ['ico'])) {
+                return json([
+                    'code' => 1,
+                    'msg' => '网站favicon格式错误,仅支持ico'
+                ]);
+            }
+            $path = public_path() . '/static/images/';
+            $faviconpath = '/static/images/favicon.ico';
+            try {
+                $faviconFile->move($path, 'favicon.ico');
+            } catch (\Exception $e) {
+                return json([
+                    'code' => 1,
+                    'msg' => '上传失败'
+                ]);
+            }
+        }
+        ConfigService::set('website', [
+            'webName' => $webName,
+            'webLogo' => $iconpath,
+            'webFavicon' => $faviconpath
+        ], "网站信息");
+        return json([
+            'code' => 0,
+            'msg' => '设置成功'
         ]);
     }
 }

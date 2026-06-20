@@ -36,7 +36,7 @@ class Check
         return md5($signContent);
     }
 
-    public function getUploadParam($checkid,$notify){
+    public function getUploadParam(string $checkid,string $notify){
         $config = ConfigService::get("checkkey");
         if (empty($config)) {
             return [
@@ -63,7 +63,7 @@ class Check
         if (empty($config)) {
             return [
                 'code' => 1,
-                'msg' => '配置错误'
+                'msg' => '还没有配置秘钥，请先配置秘钥'
             ];
         }
 
@@ -76,7 +76,7 @@ class Check
         if (empty($config['key'])) {
             return [
                 'code' => 1,
-                'msg' => '配置错误'
+                'msg' => '还没有配置秘钥，请先配置秘钥'
             ];
         }
         //获取信息
@@ -98,12 +98,12 @@ class Check
         return $result;
     }
 
-    public function payOrder($orderid,$title,$author,$end_date){
+    public function payOrder(string $orderid, string $title, string $author, ?string $end_date, ?string $school_id, ?string $class_code, ?string $class_type){
         $config = ConfigService::get("checkkey");
         if (empty($config)) {
             return [
                 'code' => 1,
-                'msg' => '配置错误'
+                'msg' => '还没有配置秘钥，请先配置秘钥'
             ];
         }
 
@@ -116,7 +116,7 @@ class Check
         if (empty($config['key'])) {
             return [
                 'code' => 1,
-                'msg' => '配置错误'
+                'msg' => '还没有配置秘钥，请先配置秘钥'
             ];
         }
         $params = [
@@ -128,6 +128,15 @@ class Check
         ];
         if(!empty($end_date)){
             $params['end_date'] = $end_date;
+        }
+        if(!empty($school_id)){
+            $params['school_id'] = $school_id;
+        }
+        if(!empty($class_code)){
+            $params['class_code'] = $class_code;
+        }
+        if(!empty($class_type)){
+            $params['class_type'] = $class_type;
         }
         $sign = $this->generateSignature($params, $config['key']);
         $params['sign'] = $sign;
@@ -143,12 +152,12 @@ class Check
     }
 
     //获取订单状态
-    public function getOrderStatus($orderid){
+    public function getOrderStatus(string $orderid){
         $config = ConfigService::get("checkkey");
         if (empty($config)) {
             return [
                 'code' => 1,
-                'msg' => '配置错误'
+                'msg' => '还没有配置秘钥，请先配置秘钥'
             ];
         }
 
@@ -161,7 +170,7 @@ class Check
         if (empty($config['key'])) {
             return [
                 'code' => 1,
-                'msg' => '配置错误'
+                'msg' => '还没有配置秘钥，请先配置秘钥'
             ];
         }
         $params = [
@@ -189,7 +198,7 @@ class Check
         if (empty($config)) {
             return [
                 'code' => 1,
-                'msg' => '配置错误'
+                'msg' => '还没有配置秘钥，请先配置秘钥'
             ];
         }
 
@@ -202,7 +211,7 @@ class Check
         if (empty($config['key'])) {
             return [
                 'code' => 1,
-                'msg' => '配置错误'
+                'msg' => '还没有配置秘钥，请先配置秘钥'
             ];
         }
         $params = [

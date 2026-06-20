@@ -2,6 +2,7 @@
 
 namespace app\tool;
 
+use app\model\AttachModel;
 use app\model\CheckModel;
 use app\model\CheckOrderModel;
 use app\model\ShopModel;
@@ -104,7 +105,7 @@ class QueueJob
                 return 0;
             }
         }
-        
+
         if (empty($down_file)) {
             //需要下载文件
             $purl = parse_url($url, PHP_URL_PATH);
@@ -168,20 +169,25 @@ class QueueJob
         }
         //判断是否要增加文件
         $order = CheckOrderModel::where('id', $orderid)->find();
-        $shop = ShopModel::where('id', $order->shopid)->find();
-        if (!empty($shop)) {
-            if (!empty($shop->file_path)) {
-                if (file_exists($shop->file_path)) {
-                    if (!empty($shop->file_name)) {
-                        $zip_tmp = new \ZipArchive();
-                        if ($zip_tmp->open($down_file, \ZipArchive::CREATE) === TRUE) {
-                            $zip_tmp->addFile($shop->file_path, $shop->file_name); //添加新的文件
-                            $zip_tmp->close();
+        if (!str_starts_with($order->product_id, "cqvip")) {
+            $attach = AttachModel::where("userid", $order->userid)->where("file_status", 2)->find();
+            if (!empty($attach)) {
+                if ($attach->file_status == 2) {
+                    if (!empty($attach->file_path)) {
+                        if (file_exists($attach->file_path)) {
+                            if (!empty($attach->file_name)) {
+                                $zip_tmp = new \ZipArchive();
+                                if ($zip_tmp->open($down_file, \ZipArchive::CREATE) === TRUE) {
+                                    $zip_tmp->addFile($attach->file_path, $attach->file_name); //添加新的文件
+                                    $zip_tmp->close();
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+
         //需要验证zip文件是否OK
         $zip = new \ZipArchive;
         if ($zip->open($down_file) === TRUE) {

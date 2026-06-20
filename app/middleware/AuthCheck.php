@@ -23,6 +23,9 @@ class AuthCheck
         $authorization = $request->header('authorization');
         $userid = $request->header('userid');
 
+        $baseUrl = $request->baseUrl();
+        //Log::write('auth check', 'baseUrl:'.$baseUrl);
+
         // 验证Authorization是否存在
         if (empty($authorization) || empty($userid)) {
             Log::write('auth check', 'no authorization');
@@ -31,9 +34,16 @@ class AuthCheck
                 'msg' => '登录已经过期，请重新登录'
             ], 401);
         }
-
-        $user = AdminModel::where('id', $userid)->find();
-
+        $isAdmin = false;
+        if (str_starts_with($baseUrl, "/manage")) {
+            $isAdmin = true;
+        }
+        if ($isAdmin) {
+            $isAdmin = true;
+            $user = AdminModel::where('id', $userid)->find();
+        } else {
+            $user = UserModel::where('id', $userid)->find();
+        }
         if (empty($user)) {
             Log::write('auth check', 'user not found');
             return json([
@@ -75,7 +85,6 @@ class AuthCheck
             ], 401);
         }
         $request->userid = $userid;
-        // 验证通过，继续处理请求
         return $next($request);
     }
 }

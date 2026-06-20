@@ -632,7 +632,7 @@ class PayService
         ];
     }
 
-    public function paySucess($payid)
+    public function paySucess(string $payid)
     {
         $payorder = PayRecordModel::where('id', $payid)->find();
         if (empty($payorder)) {
@@ -657,10 +657,17 @@ class PayService
                 'msg' => '该订单不存在！'
             ];
         }
-        CheckOrderModel::where("id", $payorder->orderid)->update(['status' => 4, 'payid' => $payid, 'update_time' => date('Y-m-d H:i:s')]);
-        PayRecordModel::where('id', $payid)->update(['status' => 1, 'update_time' => date('Y-m-d H:i:s')]);
+        $now = date('Y-m-d H:i:s');
+        $spayid = substr($payid, 0, 4) . "*****" . substr($payid, -4);
+        CheckOrderModel::where("id", $payorder->orderid)->update(['status' => 4, 'payid' => $payid, 'spayid' => $spayid, 'pay_time' => $now, 'update_time' => $now]);
+        PayRecordModel::where('id', $payid)->update(['status' => 1, 'update_time' => $now]);
+        //记录收入
+        $user = UserModel::where("id", $checkOrder->userid)->find();
+        if (!empty($user)) {
+           $user->increaseBalance($checkOrder->profit,1,$checkOrder->id);
+        }
         //支付订单
-        $ret =  (new Check())->payOrder($checkOrder->id, $checkOrder->title, $checkOrder->author, $checkOrder->end_date);
+        $ret =  (new Check())->payOrder($checkOrder->id, $checkOrder->title, $checkOrder->author, $checkOrder->end_date, $checkOrder->school_id, $checkOrder->class_code, $checkOrder->class_type);
         if ($ret['code'] == 0) {
             CheckOrderModel::where("id", $payorder->orderid)->update(['status' => 5, 'update_time' => date('Y-m-d H:i:s')]);
         } else {
@@ -668,8 +675,9 @@ class PayService
         }
     }
 
-    public function refund($payid)
+    public function refund(string $payid)
     {
+        $ret = [];
         $payRecord = PayRecordModel::where("id", $payid)->find();
         if (empty($payRecord)) {
             return [
@@ -678,9 +686,23 @@ class PayService
             ];
         }
         if ($payRecord->method == "alipay") {
-            return $this->aliRefund($payRecord->id, $payRecord->price, $payRecord->modeid, $payRecord->type);
+            $ret =  $this->aliRefund($payRecord->id, $payRecord->price, $payRecord->modeid, $payRecord->type);
         } else if ($payRecord->method == "wechat") {
-            return $this->wxRefund($payRecord->id, $payRecord->price, $payRecord->modeid, $payRecord->type);
+            $ret =  $this->wxRefund($payRecord->id, $payRecord->price, $payRecord->modeid, $payRecord->type);
         }
+         if ($ret['code'] != 0) {
+            return $ret;
+         }
+         CheckOrderModel::where(["id" => $payRecord->orderid])->update(["status" => 9, "update_time" => date('Y-m-d H:i:s')]);
+         $order = CheckOrderModel::where(["id" => $payRecord->orderid])->find();
+         if(empty($order)){
+             return $ret;
+         }
+         $user = UserModel::where('id',$order->userid)->find();
+         if(empty($user)){
+            return $ret;
+         }
+         $user->decreaseBalance($order->profit,3,$order->id,'订单退款');
+         return $ret;
     }
 }

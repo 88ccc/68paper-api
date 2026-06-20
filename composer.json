@@ -31,7 +31,9 @@
         "topthink/think-queue": "^3.0",
         "hyperf/pimple": "^2.2",
         "alibabacloud/oss-v2": "^0.4.0",
-        "qcloud/cos-sdk-v5": "^2.6"
+        "qcloud/cos-sdk-v5": "^2.6",
+        "phpmailer/phpmailer": "^7.1",
+        "overtrue/easy-sms": "^3.3"
     },
     "require-dev": {
         "topthink/think-dumper": "^1.0",

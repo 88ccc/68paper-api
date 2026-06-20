@@ -14,10 +14,10 @@ class ArticleModel extends Model
     // 模型数据表主键
     protected $pk = 'id';
     protected $schema = [
-        'id'          => 'int',             //id 自增益
+        'id'          => 'string',             //id 自增益
         'title'    => 'string', //标题
         'content' => 'string', //内容
-        'updated_time' => 'datetime', //更新时间
+        'update_time' => 'datetime', //更新时间
       
     ];
 }

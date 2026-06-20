@@ -22,11 +22,14 @@ class CheckModel extends Model
         'id'          => 'string',
         'name' => 'string', //产品名称
         'cost' => 'int', //成本价格单位分
+        'price' => 'int', //供货价格单位分
         'unit'  => 'int', //计费单位,0按次计费,其他按字数计费
         'mini_price'  => 'int', //限制最低售价单位分
-        'supplier_status'  => 'int', //供货方状态：1=正常，2=禁用，3=已删除
+        'low_price'  => 'int', //88xuezi供货商规定的低售价单位分
+        'supplier_status'  => 'int', //供货方状态：1=正常，2=禁用
         'status'  => 'int', //状态：1=正常，2=禁用
         'config' => 'json', //配置信息JSON格式
+        'remark' => 'string', //备注
         'create_time'  => 'datetime',         //创建时间
         'update_time'  => 'datetime',         //更新时间
     ];

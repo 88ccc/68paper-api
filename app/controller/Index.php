@@ -4,26 +4,32 @@ namespace app\controller;
 
 use app\BaseController;
 use app\model\AdminModel;
+use app\model\ArticleModel;
+use app\model\AttachModel;
 use app\model\CheckModel;
 use app\model\CheckOrderModel;
 use app\model\PayRecordModel;
 use app\model\PaySetModel;
-use app\model\ShopModel;
+use app\model\UserModel;
 use app\service\ConfigService;
 use app\service\WxPublicService;
 use think\facade\Log;
-use app\model\ShopProductModel;
+use app\model\SmsModel;
+use app\model\EmailModel;
+use app\model\NoticeModel;
 use app\service\CheckService;
 use app\supplier\Check;
 use app\service\PayService;
 use app\service\StorageService;
 use think\facade\Cache;
+use think\facade\Config;
 
 class Index extends BaseController
 {
+    private $is_test = false; ////是否是演示平台  正式使用时应该设置为false
     public function index()
     {
-        return '欢迎使用';
+        return '欢迎使用 V2.0.0';
     }
 
 
@@ -94,9 +100,33 @@ class Index extends BaseController
     {
         $list['code'] = 0;
         $list['msg'] = '';
+        $config1 = ConfigService::get("website");
+        if (!empty($config1)) {
+            $list['data']['website'] = $config1;
+        }
         $config3 = ConfigService::get("custom");
         if (!empty($config3)) {
             $list['data']['custom'] = $config3;
+        }
+
+        $config2 = ConfigService::get("loginRegister");
+        if (!empty($config2)) {
+            $list['data']['loginRegister'] = $config2;
+        }
+
+        //是否启用了短信
+        $sms = ConfigService::get("sms");
+        if (!empty($sms)) {
+            $list['data']['sms'] = true;
+        } else {
+            $list['data']['sms'] = false;
+        }
+        //是否启用了邮件
+        $email = ConfigService::get("email");
+        if (!empty($email)) {
+            $list['data']['email'] = true;
+        } else {
+            $list['data']['email'] = false;
         }
 
         //是否启用了公众号
@@ -106,6 +136,9 @@ class Index extends BaseController
         } else {
             $list['data']['wechat'] = false;
         }
+        $frontend = Config::get('website.frontend_domain');
+        $list['data']['frontend'] = $frontend;
+
         return json($list);
     }
 
@@ -187,21 +220,27 @@ class Index extends BaseController
         ]);
     }
 
-    public function downShopFile()
+    public function downAttachFile()
     {
-        $shopid = $this->request->get("shopid");
-        $show = ShopModel::where('id', $shopid)->find();
-        if (empty($show)) {
+        $shopid = $this->request->get("userid");
+        $attach = AttachModel::where('id', $shopid)->find();
+        if (empty($attach)) {
             return json([
                 'code' => 1,
-                'msg' => '店铺不存在'
+                'msg' => '附件不存在'
             ]);
         }
-        $file_path =  $show->file_path;
-        if (empty($show->file_name)) {
+        $file_path =  $attach->file_path;
+        if (empty($attach->file_name)) {
             return json([
                 'code' => 1,
                 'msg' => '文件不存在'
+            ]);
+        }
+        if ($attach->file_status != 1 && $attach->file_status != 2) {
+            return json([
+                'code' => 1,
+                'msg' => '文件不可用'
             ]);
         }
         if (!file_exists($file_path)) {
@@ -215,7 +254,7 @@ class Index extends BaseController
             Header("Content-type: application/octet-stream");
             Header("Accept-Ranges: bytes");
             Header("Accept-Length:" . filesize($file_path));
-            Header("Content-Disposition: attachment;filename=" . $show->file_name);
+            Header("Content-Disposition: attachment;filename=" . $attach->file_name);
             ob_clean();     // 重点！！！
             flush();        // 重点！！！！可以清除文件中多余的路径名以及解决乱码的问题：
             //输出文件内容
@@ -224,201 +263,6 @@ class Index extends BaseController
             fclose($file1);
             return;
         }
-    }
-
-    public function getAllProduct()
-    {
-        $shopid = $this->request->get("shopid");
-        if (empty($shopid)) {
-            return json([
-                'code' => 1,
-                'msg' => 'shopid必须填写'
-            ]);
-        }
-        $shop = ShopModel::where("id", $shopid)->find();
-        if (empty($shop)) {
-            return json([
-                'code' => 1,
-                'msg' => '该店铺不存在'
-            ]);
-        }
-        if ($shop->status != 1) {
-            return json([
-                'code' => 1,
-                'msg' => '该店铺被禁用'
-            ]);
-        }
-        $data = [];
-        $products = ShopProductModel::where("shopid", $shopid)->select();
-        foreach ($products as $product) {
-            $check = CheckModel::where("id", $product->productid)->find();
-            $status = 2;
-            if (($check->supplier_status == 1) && ($check->status == 1) && ($product->status == 1)) {
-                $status = 1;
-            }
-            $data[] = [
-                "id" => $product->productid,
-                "name" => $check->name,
-                'price' => $product->price,
-                'unit' => $product->unit,
-                'status' => $status,
-                'config' => $check->config
-            ];
-        }
-
-        return json([
-            'code' => 0,
-            'msg' => '',
-            'data' => $data
-        ]);
-    }
-
-    public function getUploadParam()
-    {
-        $checkid = $this->request->post("product_id");
-        $shopid = $this->request->post("shopid");
-        if (empty($checkid)) {
-            return json([
-                'code' => 1,
-                'msg' => 'product_id必须填写'
-            ]);
-        }
-        if (empty($shopid)) {
-            return json([
-                'code' => 1,
-                'msg' => 'shopid必须填写'
-            ]);
-        }
-        //检查店铺信息
-        $shop = ShopModel::where("id", $shopid)->find();
-        if (empty($shop)) {
-            return json([
-                'code' => 1,
-                'msg' => '该店铺不存在'
-            ]);
-        }
-        if ($shop->status != 1) {
-            return json([
-                'code' => 1,
-                'msg' => '该店铺被禁用'
-            ]);
-        }
-
-        $check = CheckModel::where("id", $checkid)->find();
-        if (empty($check)) {
-            return json([
-                'code' => 1,
-                'msg' => '该货源不存在'
-            ]);
-        }
-        if (($check->supplier_status != 1) || ($check->status != 1)) {
-            return json([
-                'code' => 1,
-                'msg' => '该商品不可用'
-            ]);
-        }
-        $product = ShopProductModel::where(['shopid' => $shopid, 'productid' => $checkid])->find();
-        if (empty($product)) {
-            return json([
-                'code' => 1,
-                'msg' => '该商品不存在'
-            ]);
-        }
-        if ($product->status != 1) {
-            return json([
-                'code' => 1,
-                'msg' => '该商品不可用'
-            ]);
-        }
-        $domain = $this->request->domain();
-        $notify = $domain . "/notify/checkOrderStatus";
-        $data = (new Check())->getUploadParam($checkid, $notify);
-
-        return json([
-            'code' => 0,
-            'msg' => '',
-            'data' => $data
-        ]);
-    }
-
-    public function createCheckOrder()
-    {
-        $orderid = $this->request->post("orderid");
-        $shopid = $this->request->post("shopid");
-        $productid = $this->request->post("product_id");
-        if (empty($orderid)) {
-            return json([
-                'code' => 1,
-                'msg' => 'orderid必须填写'
-            ]);
-        } else {
-            $orderid = trim($orderid);
-        }
-        if (empty($shopid)) {
-            return json([
-                'code' => 1,
-                'msg' => 'shopid必须填写'
-            ]);
-        } else {
-            $shopid = trim($shopid);
-        }
-        if (empty($productid)) {
-            return json([
-                'code' => 1,
-                'msg' => 'productid必须填写'
-            ]);
-        } else {
-            $productid = trim($productid);
-        }
-        CheckOrderModel::insert([
-            'id' => $orderid,
-            'shopid' => $shopid,
-            'product_id' => $productid,
-            'status' => 1,
-            'create_time' => date('Y-m-d H:i:s'),
-            'update_time' => date('Y-m-d H:i:s'),
-        ]);
-        return json([
-            'code' => 0,
-            'msg' => '',
-        ]);
-    }
-
-    private function getCheckOrder($orderid)
-    {
-        $order = CheckOrderModel::where(['id' => $orderid])->withoutField(['original', 'cost', 'profit', 'lock', 'file_key', 'lock_time'])->find();
-        if (empty($order)) {
-            return json([
-                'code' => 1,
-                'msg' => '订单不存在'
-            ]);
-        }
-        $data = $order->toArray();
-        if ($data['status'] != 8) {
-            $data['report_url'] = "";
-        }
-        return [
-            'code' => 0,
-            'msg' => '',
-            'data' => $data
-        ];
-    }
-
-    public function getCheckOrderStatus()
-    {
-        $orderid = $this->request->post("orderid");
-        if (empty($orderid)) {
-            return json([
-                'code' => 1,
-                'msg' => 'orderid必须填写'
-            ]);
-        } else {
-            $orderid = trim($orderid);
-        }
-
-        $ret = $this->getCheckOrder($orderid);
-
-        return json($ret);
     }
 
 
@@ -433,6 +277,12 @@ class Index extends BaseController
 
     public function getPayQRcode()
     {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '测试环境不支持'
+            ]);
+        }
         $data = $this->request->post();
         if (!isset($data['type'])) {
             return json([
@@ -489,7 +339,7 @@ class Index extends BaseController
         }
         $amount = floatval($data['amount']);
 
-       
+
         if ($data['type'] == 'wechat') {
             $type = 1; //微信支付
         } else if (($data['type'] == 'alipay')) {
@@ -513,7 +363,7 @@ class Index extends BaseController
                 'msg' => "订单不存在"
             ]);
         }
-        if($order->status != 2){
+        if ($order->status != 2) {
             return json([
                 'code' => 99,
                 'msg' => "该订单不需要支付"
@@ -546,131 +396,12 @@ class Index extends BaseController
 
     public function getH5Pay()
     {
-         $data = $this->request->post();
-        if (!isset($data['type'])) {
+        if ($this->is_test) {
             return json([
                 'code' => 1,
-                'msg' => '类型不能为空'
+                'msg' => '测试环境不支持'
             ]);
         }
-
-        if (!isset($data['orderid'])) {
-            return json([
-                'code' => 1,
-                'msg' => '订单号不能为空'
-            ]);
-        }
-
-        //金额
-        if (!isset($data['amount'])) {
-            return json([
-                'code' => 10005,
-                'msg' => '金额不能为空'
-            ]);
-        }
-        if ($data['amount'] <= 0) {
-            return json([
-                'code' => 10006,
-                'msg' => '金额错误'
-            ]);
-        }
-        if (!isset($data['modeid'])) {
-            return json([
-                'code' => 10009,
-                'msg' => '模版id不能为空'
-            ]);
-        }
-        //判断金额是否为数字，紧紧支持两位小数
-        if (!is_numeric($data['amount'])) {
-            return json([
-                'code' => 10007,
-                'msg' => '金额错误'
-            ]);
-        }
-        //点的位置
-        $pos = strpos($data['amount'], '.');
-        if ($pos === false) {
-            $pos = strlen($data['amount']);
-        }
-        //判断小数点后两位
-        if (strlen($data['amount']) - $pos - 1 > 2) {
-            $len = strlen($data['amount']);
-            return json([
-                'code' => 10008,
-                'msg' => '仅仅支持两位小数' . $len . "-" . $pos,
-            ]);
-        }
-        $amount = floatval($data['amount']);
-
-       
-        if ($data['type'] == 'wechat') {
-            $type = 1; //微信支付
-        } else if (($data['type'] == 'alipay')) {
-            $type = 2; //支付宝支付
-        } else {
-            return json([
-                'code' => 10010,
-                'msg' => '不支持的支付方式'
-            ]);
-        }
-        if ($amount <= 0) {
-            return json([
-                'code' => 10011,
-                'msg' => '金额错误'
-            ]);
-        }
-        $order = CheckOrderModel::where(['id' => $data['orderid']])->find();
-        if (empty($order)) {
-            return json([
-                'code' => 1,
-                'msg' => "订单不存在"
-            ]);
-        }
-        if($order->status != 2){
-            return json([
-                'code' => 99,
-                'msg' => "该订单不需要支付"
-            ]);
-        }
-        $price100 = bcmul($amount, 100, 0);
-        if ($price100 != $order->total_price) {
-            return json([
-                'code' => 1,
-                'msg' => "订单价格不正确"
-            ]);
-        }
-        $check = CheckModel::where("id", $order->product_id)->find();
-        if (empty($check)) {
-            return json([
-                'code' => 1,
-                'msg' => "产品不存在"
-            ]);
-        }
-        if (($check->supplier_status != 1) || ($check->status != 1)) {
-            return json([
-                'code' => 1,
-                'msg' => "产品不能使用"
-            ]);
-        }
-        $subject = $check->name;
-        $ret = [];
-        $return_url = "";
-        if(!empty($data['returnUrl'])){
-            $return_url = $data['returnUrl'];
-        }
-        if ($type == 1) {
-            $ip = $this->request->ip();
-            $ret = (new PayService())->wxH5pay($data['orderid'], $amount, $subject, $data['modeid'], $ip);
-        } else if ($type == 2) {
-            $ret = (new PayService())->aliH5pay($data['orderid'], $amount, $subject, $data['modeid'],$return_url);
-        }
-
-        return json($ret);
-    }
-
-    //微信内部，jsap支付
-    public function getMPpay()
-    {
         $data = $this->request->post();
         if (!isset($data['type'])) {
             return json([
@@ -727,7 +458,7 @@ class Index extends BaseController
         }
         $amount = floatval($data['amount']);
 
-       
+
         if ($data['type'] == 'wechat') {
             $type = 1; //微信支付
         } else if (($data['type'] == 'alipay')) {
@@ -751,7 +482,7 @@ class Index extends BaseController
                 'msg' => "订单不存在"
             ]);
         }
-        if($order->status != 2){
+        if ($order->status != 2) {
             return json([
                 'code' => 99,
                 'msg' => "该订单不需要支付"
@@ -777,7 +508,138 @@ class Index extends BaseController
                 'msg' => "产品不能使用"
             ]);
         }
-         if (empty($data['openid'])) {
+        $subject = $check->name;
+        $ret = [];
+        $return_url = "";
+        if (!empty($data['returnUrl'])) {
+            $return_url = $data['returnUrl'];
+        }
+        if ($type == 1) {
+            $ip = $this->request->ip();
+            $ret = (new PayService())->wxH5pay($data['orderid'], $amount, $subject, $data['modeid'], $ip);
+        } else if ($type == 2) {
+            $ret = (new PayService())->aliH5pay($data['orderid'], $amount, $subject, $data['modeid'], $return_url);
+        }
+
+        return json($ret);
+    }
+
+    //微信内部，jsap支付
+    public function getMPpay()
+    {
+        if ($this->is_test) {
+            return json([
+                'code' => 1,
+                'msg' => '测试环境不支持'
+            ]);
+        }
+        $data = $this->request->post();
+        if (!isset($data['type'])) {
+            return json([
+                'code' => 1,
+                'msg' => '类型不能为空'
+            ]);
+        }
+
+        if (!isset($data['orderid'])) {
+            return json([
+                'code' => 1,
+                'msg' => '订单号不能为空'
+            ]);
+        }
+
+        //金额
+        if (!isset($data['amount'])) {
+            return json([
+                'code' => 10005,
+                'msg' => '金额不能为空'
+            ]);
+        }
+        if ($data['amount'] <= 0) {
+            return json([
+                'code' => 10006,
+                'msg' => '金额错误'
+            ]);
+        }
+        if (!isset($data['modeid'])) {
+            return json([
+                'code' => 10009,
+                'msg' => '模版id不能为空'
+            ]);
+        }
+        //判断金额是否为数字，紧紧支持两位小数
+        if (!is_numeric($data['amount'])) {
+            return json([
+                'code' => 10007,
+                'msg' => '金额错误'
+            ]);
+        }
+        //点的位置
+        $pos = strpos($data['amount'], '.');
+        if ($pos === false) {
+            $pos = strlen($data['amount']);
+        }
+        //判断小数点后两位
+        if (strlen($data['amount']) - $pos - 1 > 2) {
+            $len = strlen($data['amount']);
+            return json([
+                'code' => 10008,
+                'msg' => '仅仅支持两位小数' . $len . "-" . $pos,
+            ]);
+        }
+        $amount = floatval($data['amount']);
+
+
+        if ($data['type'] == 'wechat') {
+            $type = 1; //微信支付
+        } else if (($data['type'] == 'alipay')) {
+            $type = 2; //支付宝支付
+        } else {
+            return json([
+                'code' => 10010,
+                'msg' => '不支持的支付方式'
+            ]);
+        }
+        if ($amount <= 0) {
+            return json([
+                'code' => 10011,
+                'msg' => '金额错误'
+            ]);
+        }
+        $order = CheckOrderModel::where(['id' => $data['orderid']])->find();
+        if (empty($order)) {
+            return json([
+                'code' => 1,
+                'msg' => "订单不存在"
+            ]);
+        }
+        if ($order->status != 2) {
+            return json([
+                'code' => 99,
+                'msg' => "该订单不需要支付"
+            ]);
+        }
+        $price100 = bcmul($amount, 100, 0);
+        if ($price100 != $order->total_price) {
+            return json([
+                'code' => 1,
+                'msg' => "订单价格不正确"
+            ]);
+        }
+        $check = CheckModel::where("id", $order->product_id)->find();
+        if (empty($check)) {
+            return json([
+                'code' => 1,
+                'msg' => "产品不存在"
+            ]);
+        }
+        if (($check->supplier_status != 1) || ($check->status != 1)) {
+            return json([
+                'code' => 1,
+                'msg' => "产品不能使用"
+            ]);
+        }
+        if (empty($data['openid'])) {
             return json([
                 'code' => 1,
                 'msg' => '缺少参数openid'
@@ -904,99 +766,361 @@ class Index extends BaseController
         ]);
     }
 
-    public function getCheckOrderByPayId()
+    public function getLoginRegisterConfig()
     {
-        $payid = $this->request->post('payid');
-        if (empty($payid)) {
+        //登录注册配置
+        $config = ConfigService::get("loginRegister");
+        if (empty($config)) {
             return json([
-                'code' => 1,
-                'msg' => "payid必须填写"
+                'code' => 10000,
+                'msg' => '请先配置登录注册信息'
             ]);
         } else {
-            $payid = trim($payid);
-        }
-        $payRecord = PayRecordModel::where(['id' => $payid])->find();
-        if (empty($payRecord)) {
             return json([
-                'code' => 1,
-                'msg' => '支付记录不存在'
+                'code' => 0,
+                'data' => $config
             ]);
         }
-        $ret = $this->getCheckOrder($payRecord->orderid);
-        return json($ret);
     }
 
-    public function deleteReport()
+    //发送短信验证吗
+    public function sendSmsCode()
     {
-        $orderid = $this->request->post('orderid');
-        if (empty($orderid)) {
+        $phone = $this->request->param('phone');
+        $userid = $this->request->param('userid', '0');
+        if (empty($phone)) {
             return json([
                 'code' => 1,
-                'msg' => '订单号不能为空'
+                'msg' => '请输入手机号'
             ]);
+        }
+        $sms = new SmsModel();
+        $result = $sms->sendCode($phone, $userid);
+        return json($result);
+    }
+    //发送邮箱验证码
+    public function sendEmailCode()
+    {
+        $email = $this->request->param('email');
+        $userid = $this->request->param('userid', '0');
+        $isReg_input = $this->request->param('isReg', 'true');
+        //判断
+        $isReg = false;
+        if (is_bool($isReg_input)) {
+            $isReg = $isReg_input;
         } else {
-            $orderid = trim($orderid);
+            if (is_string($isReg_input)) {
+                $isReg = strtolower($isReg_input) == 'true';
+            }
         }
-        $order = CheckOrderModel::where(['id' => $orderid])->find();
-        if (empty($order)) {
+        if (empty($email)) {
             return json([
                 'code' => 1,
-                'msg' => '订单不存在'
+                'msg' => '请输入邮箱'
             ]);
         }
-        if ($order->status != 8) {
+        $sms = new EmailModel();
+        $result = $sms->sendCode($email, $userid, $isReg);
+        return json($result);
+    }
+
+    public function register()
+    {
+        // 用户帐号 可能是手机号也可能是邮箱
+        $account = $this->request->param('account');
+        $password = $this->request->param('password');
+        $code = $this->request->param('code');
+        $tid = $this->request->param('tid', '0');
+        $openid = $this->request->param('openid', '');
+        if (empty($account)) {
             return json([
                 'code' => 1,
-                'msg' => '订单无法删除报告'
+                'msg' => '请输入手机号或邮箱'
             ]);
         }
-        CheckOrderModel::where(['id' => $orderid])->update(['status' => 10, 'update_time' => date('Y-m-d H:i:s')]);
+        if (empty($password)) {
+            return json([
+                'code' => 1,
+                'msg' => '请输入密码'
+            ]);
+        }
+        if (empty($code)) {
+            return json([
+                'code' => 1,
+                'msg' => '请输入验证码'
+            ]);
+        }
+        $phone = "";
+        $email = "";
+
+        //判断是手机号还是邮箱
+        if (is_numeric($account)) {
+            $phone = $account;
+            $sms = new SmsModel();
+            $result = $sms->verifyCode($account, $code);
+            if ($result['code'] != 0) {
+                return json($result);
+            }
+        } else {
+            $email = $account;
+            $emailM = new EmailModel();
+            $result = $emailM->verifyCode($account, $code);
+            if ($result['code'] != 0) {
+                return json($result);
+            }
+        }
+        $ret = UserModel::add($phone, $email, $password, intval($tid), $openid);
+        return json($ret);
+    }
+    //用户登录
+    public function login()
+    {
+        $account = $this->request->param('account');
+        $password = $this->request->param('password');
+        $remember = $this->request->param('remember', false);
+        if (empty($account)) {
+            return json([
+                'code' => 1,
+                'msg' => '请输入手机号或邮箱'
+            ]);
+        }
+        if (empty($password)) {
+            return json([
+                'code' => 1,
+                'msg' => '请输入密码'
+            ]);
+        }
+        // 判断是手机号还是邮箱
+        if (is_numeric($account)) {
+            $user = UserModel::where('mobile', $account)->find();
+        } else {
+            $user = UserModel::where('email', $account)->find();
+        }
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => '用户不存在'
+            ]);
+        }
+        if ($user->pass != md5($password)) {
+            return json([
+                'code' => 1,
+                'msg' => '密码错误'
+            ]);
+        }
+        if ($user->status != 1) {
+            return json([
+                'code' => 1,
+                'msg' => '用户被禁用'
+            ]);
+        }
+        $expireTime = 24; //小时
+        if ($remember) {
+            $expireTime = 168; //周
+        }
+        $token = $user->getAuth($user->id, $expireTime);
         return json([
             'code' => 0,
-            'msg' => ""
+            'msg' => '登录成功',
+            'data' => [
+                'id' => $user->id,
+                'token' => $token['jwt'],
+                'name' => $user->name,
+                'phone' => $user->mobile,
+                'email' => $user->email,
+                'avatar' => $user->getAvatar($this->request->domain())
+            ]
+
         ]);
     }
 
-    //自助退款
-    public function selfRefund()
+    //重置密码
+    public function resetPassword()
     {
-        $orderid = $this->request->post('orderid');
-        if (empty($orderid)) {
+        $account = $this->request->param('account');
+        $code = $this->request->param('code');
+        $password = $this->request->param('password');
+        if (empty($account)) {
             return json([
                 'code' => 1,
-                'msg' => '订单号不能为空'
+                'msg' => '请输入手机号或邮箱'
             ]);
+        }
+        if (empty($code)) {
+            return json([
+                'code' => 1,
+                'msg' => '请输入验证码'
+            ]);
+        }
+        if (empty($password)) {
+            return json([
+                'code' => 1,
+                'msg' => '请输入密码'
+            ]);
+        }
+        //判断是手机号还是邮箱
+        //判断是手机号还是邮箱
+        if (is_numeric($account)) {
+            $phone = $account;
+            $sms = new SmsModel();
+            $result = $sms->verifyCode($account, $code);
+            if ($result['code'] != 0) {
+                return json($result);
+            }
+            $user = UserModel::where('mobile', $phone)->find();
         } else {
-            $orderid = trim($orderid);
+            $email = $account;
+            $emailM = new EmailModel();
+            $result = $emailM->verifyCode($account, $code);
+            if ($result['code'] != 0) {
+                return json($result);
+            }
+            $user = UserModel::where('email', $email)->find();
         }
-        $order = CheckOrderModel::where(['id' => $orderid])->find();
-        if (empty($order)) {
+        if (empty($user)) {
             return json([
                 'code' => 1,
-                'msg' => '订单不存在'
+                'msg' => '用户不存在'
             ]);
         }
-        if ($order->status != 7) {
+        $user->pass = md5($password);
+        try {
+            $result = $user->save();
+        } catch (\Exception $e) {
             return json([
                 'code' => 1,
-                'msg' => '该订单不能自助退款，请联系客服'
+                'msg' => '修改密码失败'
             ]);
         }
-        $ret = (new PayService())->refund($order->payid);
-        if ($ret['code'] == 0) {
-            CheckOrderModel::where(["id" => $order->id])->update(["status" => 9, "update_time" => date('Y-m-d H:i:s')]);
+        if ($result) {
             return json([
                 'code' => 0,
-                'msg' => "退款成功"
+                'msg' => '修改密码成功'
             ]);
         } else {
             return json([
-                'code' => 0,
-                'msg' => "退款失败请联系客服"
+                'code' => 1,
+                'msg' => '修改密码失败'
             ]);
         }
     }
 
+    public function down_attachment()
+    {
+        $userid = $this->request->get('id');
+        if (empty($userid)) {
+            return json([
+                'code' => 1,
+                'msg' => '请输入用户id'
+            ]);
+        }
+        $attach = AttachModel::where('userid', $userid)->find();
+        if (empty($attach)) {
+            return json([
+                'code' => 1,
+                'msg' => '文件不存在'
+            ]);
+        }
+        if ($attach->file_status == 0 || $attach->file_status == 3 || $attach->file_status == 4) {
+            $list['code'] = 1;
+            $list['msg'] = '状态不正确，文件不存在';
+            return json($list);
+        }
+        if (empty($attach->file_name)) {
+            $list['code'] = 1;
+            $list['msg'] = '状态不正确，文件名称为空';
+            return json($list);
+        }
+
+        $file_name = $attach->file_name;
+
+
+        $file_path =  $attach->file_path;
+
+        if (!file_exists($file_path)) {
+            $list['code'] = 1;
+            $list['msg'] = '文件不存在' . $file_path;
+            return json($list);
+        } else {
+            // 打开文件
+            $file1 = fopen($file_path, "r");
+            // 输入文件标签
+            Header("Content-type: application/octet-stream");
+            Header("Accept-Ranges: bytes");
+            Header("Accept-Length:" . filesize($file_path));
+            Header("Content-Disposition: attachment;filename=" . $file_name);
+            ob_clean();     // 重点！！！
+            flush();        // 重点！！！！可以清除文件中多余的路径名以及解决乱码的问题：
+            //输出文件内容
+            //读取文件内容并直接输出到浏览器
+            echo fread($file1, filesize($file_path));
+            fclose($file1);
+            return;
+        }
+    }
+
+    public function getCheckIdAndName()
+    {
+
+        $count = CheckModel::count();
+        $products = CheckModel::field('id,name')->select();
+        $list['code'] = 0;
+        $list["count"] = $count;
+        $list["data"] = $products;
+        return json($list);
+    }
+
+    public function getNotice()
+    {
+        $notice = ArticleModel::where('id', 'notice')->find();
+        if (empty($notice)) {
+            return json([
+                'code' => 0,
+                'msg' => '',
+                'data' => ''
+            ]);
+        }
+
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => $notice->content
+        ]);
+    }
+
+    public function getWithdrawConfig()
+    {
+        $config = ConfigService::get("withdraw");
+        if (empty($config)) {
+            return json([
+                'code' => 10000,
+                'msg' => '请先配置提现信息'
+            ]);
+        } else {
+            return json([
+                'code' => 0,
+                'msg' => '',
+                'data' => $config
+            ]);
+        }
+    }
+    public function getWebsiteConfig()
+    {
+        //网站配置
+        $config = ConfigService::get("website");
+        if (empty($config)) {
+            return json([
+                'code' => 10000,
+                'msg' => '请先配置网站信息'
+            ]);
+        } else {
+            return json([
+                'code' => 0,
+                'msg' => '',
+                'data' => $config
+            ]);
+        }
+    }
     public function orderSync()
     {
         //处理供货失败的订单
@@ -1008,10 +1132,10 @@ class Index extends BaseController
         Cache::set('syncorder', "1", 240);
         $time = date("Y-m-d H:i:s", strtotime("-5 minute"));
         $orders = CheckOrderModel::where([
-            ['status', '=', 4]
+            ['status', 'in', [4, 6]]
         ])->whereTime('update_time', '<', $time)->order('create_time', 'asc')->limit(0, 10)->select();
         foreach ($orders as $order) {
-            $ret =  (new Check())->payOrder($order->id, $order->title, $order->author, $order->end_date);
+            $ret =  (new Check())->payOrder($order->id, $order->title, $order->author, $order->end_date, $order->school_id, $order->class_code, $order->class_type);
             if ($ret['code'] == 0) {
                 CheckOrderModel::where("id", $order->id)->update(['status' => 5, 'update_time' => date('Y-m-d H:i:s')]);
             } else {
@@ -1025,7 +1149,6 @@ class Index extends BaseController
         ])->whereTime('update_time', '<', $time)->order('create_time', 'asc')->limit(0, 10)->select();
         foreach ($orders as $order) {
             $ret = (new Check())->getOrderStatus($order->id);
-            Log::write($ret);
             if ($ret['code'] == 0) {
                 (new CheckService())->updateStatusFromSupplier($ret['data']);
             } else {

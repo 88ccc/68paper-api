@@ -13,8 +13,8 @@ class Notify extends BaseController
     public function checkOrderStatus()
     {
         $data = $this->request->post();
-        Log::write("checkOrderStatus");
-        Log::write($data);
+        // Log::write("checkOrderStatus");
+        // Log::write($data);
         $ret = (new CheckService())->updateStatusFromSupplier($data['data']);
         if ($ret) {
             header('Content-Type: text/plain; charset=utf-8');

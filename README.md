@@ -7,10 +7,10 @@
   5. 可以在报告中加入一个pdf格式的附件，一般都用做广告
 
 # 演示网站
-   1、管理端 [https://admin.68paper.com/super](https://admin.68paper.com/super)
-      账号：admin 密码：123456
-   2、代理注册端 [https://check.68paper.com](https://check.68paper.com)
-      账号：自己注册
+   1、管理端 [https://admin.68paper.com/super](https://admin.68paper.com/super)  
+      账号：admin 密码：123456  
+   2、代理注册端 [https://check.68paper.com](https://check.68paper.com)  
+      账号：自己注册  
 
 # 项目组成
   完整的68paper有三个代码仓库组成，需要至少三个域名（可以是二级域名，或者三级域名）  

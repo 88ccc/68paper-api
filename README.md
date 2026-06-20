@@ -9,7 +9,7 @@
 # 演示网站
    1、管理端 [https://admin.68paper.com/super](https://admin.68paper.com/super)  
       账号：admin 密码：123456  
-   2、代理注册端 [https://check.68paper.com](https://check.68paper.com)  
+   2、代理注册端 [https://admin.68paper.com](https://admin.68paper.com)  
       账号：自己注册  
 
 # 项目组成

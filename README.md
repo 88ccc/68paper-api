@@ -18,7 +18,7 @@
   项目仓库：
   1. 后端  
   github仓库 [https://github.com/88ccc/68paper-api.git](https://github.com/88ccc/68paper-api.git)  
-  gitee仓库 [https://gitee.com/su88/68paper-api.git](https://github.com/88ccc/68paper-api.git)
+  gitee仓库 [https://gitee.com/su88/68paper-api.git](https://gitee.com/su88/68paper-api.git)
   2. 管理前端  
   github仓库 [https://github.com/88ccc/68paper-admin.git](https://github.com/88ccc/68paper-admin.git)  
   gitee仓库 [https://gitee.com/su88/68paper-admin.git](https://gitee.com/su88/68paper-admin.git)

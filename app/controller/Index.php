@@ -16,7 +16,7 @@ use app\service\WxPublicService;
 use think\facade\Log;
 use app\model\SmsModel;
 use app\model\EmailModel;
-use app\model\NoticeModel;
+use app\model\UserWebModel;
 use app\service\CheckService;
 use app\supplier\Check;
 use app\service\PayService;
@@ -919,6 +919,11 @@ class Index extends BaseController
             $expireTime = 168; //周
         }
         $token = $user->getAuth($user->id, $expireTime);
+        $domain = "";
+        $userweb =  UserWebModel::where('userid', $user->id)->find();
+        if (!empty($userweb)) {
+            $domain = $userweb->webid;
+        }
         return json([
             'code' => 0,
             'msg' => '登录成功',
@@ -928,7 +933,8 @@ class Index extends BaseController
                 'name' => $user->name,
                 'phone' => $user->mobile,
                 'email' => $user->email,
-                'avatar' => $user->getAvatar($this->request->domain())
+                'avatar' => $user->getAvatar($this->request->domain()),
+                'domain' => $domain,
             ]
 
         ]);

@@ -147,7 +147,6 @@ class QueueJob
                 Log::error("下载文件失败，orderid:" . $orderid . ",url=" . $url);
             }
             fclose($df);
-            curl_close($ch);
         }
         if (strcmp($file_t, 'zip') != 0) {
             //如果不是zip,就要打包成zip

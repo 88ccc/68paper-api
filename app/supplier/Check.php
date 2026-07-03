@@ -281,12 +281,8 @@ class Check
         // 6. 捕获cURL请求错误
         if (curl_errno($ch)) {
             $errorMsg = 'cURL请求失败：' . curl_error($ch);
-            curl_close($ch);
             return ['error_msg' => $errorMsg];
         }
-
-        // 7. 关闭cURL会话，释放资源
-        curl_close($ch);
 
         // 8. 处理响应结果：JSON字符串转为PHP数组
         $result = json_decode($response, true);

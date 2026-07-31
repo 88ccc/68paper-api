@@ -5,16 +5,18 @@ namespace app\tool;
 use app\model\AttachModel;
 use app\model\CheckModel;
 use app\model\CheckOrderModel;
-use app\model\ShopModel;
+use app\model\UserModel;
 use app\service\StorageService;
 use think\queue\Job;
 use think\facade\Log;
+use app\service\MessageService;
+use app\service\ConfigService;
 use think\facade\Queue;
 
 class QueueJob
 {
 
-    public function fire(Job $job, $data)
+    public function fire(Job $job, array $data)
     {
 
         if ($job->attempts() > 3) {
@@ -37,24 +39,38 @@ class QueueJob
                 } else {
                     Log::error("run fire down_report not find id");
                 }
+            } else if (strcmp($data['job'], 'send_submsg') == 0) {
+                if (!empty($data['userid'])) {
+                    if (!empty($data['event'])) {
+                        $this->send_subscribe_messages($data['event'], $data['userid']);
+                    }
+                }
+                $job->delete();
             }
         } else {
             Log::error("run fire not find data job 10000");
         }
     }
 
-    public function parse_file($orderid): int
+    public function send_subscribe_messages(string $event, int $userid)
     {
+        $user = UserModel::where("id", $userid)->find();
+        if (empty($user)) {
+            return 0;
+        }
+        $message = new MessageService($userid);
+        if ($event == "txsucc") {
+            $message->withdrawSucc();
+        } else if ($event == "txfail") {
+            $message->withdrawFail();
+        } else if ($event == "points") {
+            $value = bcdiv($user->points, 100, 2);
+            $message->pointsAlarm($value);
+        }
         return 0;
     }
 
-    public function start_check($orderid)
-    {
-
-        return 0;
-    }
-
-    public function down_report($orderid, $url)
+    public function down_report(string $orderid, string $url)
     {
         //先锁定订单
         $ret  = 0;
@@ -166,19 +182,26 @@ class QueueJob
             }
             $down_file = $a;
         }
-        //判断是否要增加文件
         $order = CheckOrderModel::where('id', $orderid)->find();
-        if (!str_starts_with($order->product_id, "cqvip")) {
-            $attach = AttachModel::where("userid", $order->userid)->where("file_status", 2)->find();
-            if (!empty($attach)) {
-                if ($attach->file_status == 2) {
-                    if (!empty($attach->file_path)) {
-                        if (file_exists($attach->file_path)) {
-                            if (!empty($attach->file_name)) {
-                                $zip_tmp = new \ZipArchive();
-                                if ($zip_tmp->open($down_file, \ZipArchive::CREATE) === TRUE) {
-                                    $zip_tmp->addFile($attach->file_path, $attach->file_name); //添加新的文件
-                                    $zip_tmp->close();
+        //判断是否要增加文件
+        $attachEnable = false;
+        $funConfig = ConfigService::get("function");
+        if (!empty($funConfig)) {
+            $attachEnable = strtolower($funConfig['attach']) == 'true';
+        }
+        if ($attachEnable) {
+            if (!str_starts_with($order->product_id, "cqvip")) {
+                $attach = AttachModel::where("userid", $order->userid)->where("file_status", 2)->find();
+                if (!empty($attach)) {
+                    if ($attach->file_status == 2) {
+                        if (!empty($attach->file_path)) {
+                            if (file_exists($attach->file_path)) {
+                                if (!empty($attach->file_name)) {
+                                    $zip_tmp = new \ZipArchive();
+                                    if ($zip_tmp->open($down_file, \ZipArchive::CREATE) === TRUE) {
+                                        $zip_tmp->addFile($attach->file_path, $attach->file_name); //添加新的文件
+                                        $zip_tmp->close();
+                                    }
                                 }
                             }
                         }
@@ -186,6 +209,7 @@ class QueueJob
                 }
             }
         }
+
 
         //需要验证zip文件是否OK
         $zip = new \ZipArchive;
@@ -201,7 +225,7 @@ class QueueJob
         $save_file_name = $check->name . "_" . $order->payid;
         $report_url = (new StorageService())->save($down_file, $save_file_name);
         if (!empty($report_url)) {
-            CheckOrderModel::where('id', $orderid)->update(['lock' => 1, 'status' => 8, 'report_url' => $report_url, 'update_time' => date('Y-m-d H:i:s', time())]);
+            CheckOrderModel::where('id', $orderid)->update(['lock' => 1, 'status' => 8, 'report_url' => $report_url['url'], 'file_key' => $report_url['key'], 'update_time' => date('Y-m-d H:i:s', time())]);
         }
         return 0;
     }

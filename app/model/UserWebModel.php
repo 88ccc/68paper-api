@@ -19,6 +19,6 @@ class UserWebModel extends Model
         'qq'  => 'string', //QQ
         'wechat'  => 'string', //微信
         'phone'  => 'string', //电话
-        'pay_type' => 'string', //支付方式
+        'tid_name' => 'string',
     ];
 }

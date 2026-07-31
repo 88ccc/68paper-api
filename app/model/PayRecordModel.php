@@ -12,6 +12,8 @@ class PayRecordModel extends Model
     protected $pk = 'id';
     protected $schema = [
         'id'        => 'string',              //键值 out_trade_no
+        'scene' => 'int', //支付场景:1销售产品,2充值
+        'userid' => 'int', //发起用户id
         'orderid'      => 'string',              //用户id
         'method'       => 'string',           //支付方式:wechat,alipay
         'modeid' => 'int',        //支付模型ID

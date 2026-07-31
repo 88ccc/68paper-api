@@ -14,7 +14,7 @@ use app\supplier\Check;
 class PayService
 
 {
-    public function getConfig($modeid)
+    public function getConfig(int $modeid): array
     {
 
         $payMode = PayModeModel::where('id', $modeid)->find();
@@ -28,7 +28,12 @@ class PayService
             return [];
         }
         if ($payMode->type == 'wxpay') {
-            return [
+            $pubkeyid = "";
+            if (!empty($payMode->alipublicpath)) {
+                $tmparr = explode("--", $payMode->alipublicpath);
+                $pubkeyid = $tmparr[0];
+            }
+            $wxconfig =  [
                 'wechat' => [
                     'default' => [
                         // 「必填」商户号，服务商模式下为服务商商户号
@@ -70,6 +75,13 @@ class PayService
                 ],
                 '_force' => true
             ];
+            if (!empty($pubkeyid)) {
+                //微信支付公钥证书
+                $wxconfig['wechat']['default']['wechat_public_cert_path'] = [
+                    $pubkeyid =>  root_path() . '/cert/' . $payMode->alipublicpath
+                ];
+            }
+            return $wxconfig;
         } else if ($payMode->type == 'alipay') {
             return [
                 'alipay' => [
@@ -107,6 +119,7 @@ class PayService
                 '_force' => true
             ];
         }
+        return [];
     }
 
     /**
@@ -114,7 +127,7 @@ class PayService
      * @param int $length 字符串长度
      * @return string 随机字符串
      */
-    function generateRandomString($length = 10)
+    function generateRandomString($length = 10): string
     {
         // 定义字符集：大小写字母 + 数字
         $chars = '3456789ABCDEFGHKLMNPQRSTUVWXY';
@@ -138,7 +151,7 @@ class PayService
     /**
      * 微信浏览器内调用微信支付
      */
-    public function wxMPpay($orderid, $price, $subject, $modeid, $openid)
+    public function wxMPpay(string $orderid, int $scene, int $userid, float $price, string $subject, int $modeid, string $openid): array
     {
         $out_trade_no = 'WM' . time() . $this->generateRandomString(5);
         //金额单位分
@@ -160,6 +173,7 @@ class PayService
                 'msg' => '微信下单失败！'
             ];
         }
+        $result = null;
         try {
             $result = Pay::wechat($config)->mp($order);
         } catch (\Yansongda\Artful\Exception\InvalidResponseException $e) {
@@ -179,6 +193,8 @@ class PayService
         //记录订单
         $order = [
             'id' => $out_trade_no,
+            'scene' => $scene,
+            'userid' => $userid,
             'orderid' => $orderid,
             'method' => 'wechat',
             'modeid' => $modeid,
@@ -205,7 +221,7 @@ class PayService
         ];
     }
 
-    public function wxScanpay($orderid, $price, $subject, $modeid)
+    public function wxScanpay(string $orderid, int $scene, int $userid, float $price, string $subject, int $modeid): array
     {
         $out_trade_no = 'WS' . time() . $this->generateRandomString(5);
         //金额单位分
@@ -225,6 +241,7 @@ class PayService
                 'msg' => '微信下单失败！'
             ];
         }
+        $result = null;
         try {
             $result = Pay::wechat($config)->scan($order);
         } catch (\Yansongda\Artful\Exception\InvalidResponseException $e) {
@@ -253,6 +270,8 @@ class PayService
         //记录订单
         $order = [
             'id' => $out_trade_no,
+            'scene' => $scene,
+            'userid' => $userid,
             'orderid' => $orderid,
             'method' => 'wechat',
             'modeid' => $modeid,
@@ -273,7 +292,7 @@ class PayService
         ];
     }
 
-    public function aliRefund($payid, $amount, $modeid, $type)
+    public function aliRefund(string $payid, float $amount, int $modeid, string $type): array
     {
         $config = $this->getConfig($modeid);
         if (empty($config)) {
@@ -288,6 +307,7 @@ class PayService
             '_action' => $type,
 
         ];
+        $result = null;
         try {
             $result = Pay::alipay($config)->refund($order);
         } catch (\Yansongda\Artful\Exception\InvalidResponseException $e) {
@@ -322,7 +342,7 @@ class PayService
         ];
     }
 
-    public function aliScanpay($orderid, $price, $subject, $modeid)
+    public function aliScanpay(string $orderid, int $scene, int $userid, float $price, string $subject, int $modeid): array
     {
         $out_trade_no = 'AS' . time() . $this->generateRandomString(5);
 
@@ -338,6 +358,7 @@ class PayService
                 'msg' => '支付宝下单失败！'
             ];
         }
+        $result = null;
 
         try {
             $result = Pay::alipay($config)->scan($order);
@@ -370,6 +391,8 @@ class PayService
         //记录订单
         $order = [
             'id' => $out_trade_no,
+            'scene' => $scene,
+            'userid' => $userid,
             'orderid' => $orderid,
             'method' => 'alipay',
             'modeid' => $modeid,
@@ -391,7 +414,7 @@ class PayService
     }
 
     //支付宝H5支付
-    public function aliH5pay($orderid, $price, $subject, $modeid, $return_url)
+    public function aliH5pay(string $orderid, int $scene, int $userid, float $price, string $subject, int $modeid, ?string $return_url): array
     {
         $out_trade_no = 'AH' . time() . $this->generateRandomString(5);
         $order = [
@@ -412,6 +435,7 @@ class PayService
                 'msg' => '支付宝下单失败！'
             ];
         }
+        $result = null;
 
         try {
             $result = Pay::alipay($config)->h5($order);
@@ -433,6 +457,8 @@ class PayService
         //记录订单
         $order = [
             'id' => $out_trade_no,
+            'scene' => $scene,
+            'userid' => $userid,
             'orderid' => $orderid,
             'method' => 'alipay',
             'modeid' => $modeid,
@@ -455,7 +481,7 @@ class PayService
         ];
     }
 
-    public function wxRefund($payid, $amount, $modeid, $type)
+    public function wxRefund(string $payid, float $amount, int $modeid, string $type): array
     {
         $config = $this->getConfig($modeid);
         if (empty($config)) {
@@ -475,6 +501,7 @@ class PayService
             ],
             '_action' => $type,
         ];
+        $result = null;
         try {
             $result = Pay::wechat($config)->refund($order);
         } catch (\Yansongda\Artful\Exception\InvalidResponseException $e) {
@@ -512,7 +539,7 @@ class PayService
     }
 
     //微信h5支付
-    public function wxH5pay($orderid, $price, $subject, $modeid, $ip)
+    public function wxH5pay(string $orderid, int $scene, int $userid, float $price, string $subject, int $modeid, string $ip): array
     {
         $out_trade_no = 'WH' . time() . $this->generateRandomString(5);
         //金额单位分
@@ -539,6 +566,7 @@ class PayService
                 'msg' => '微信下单失败！'
             ];
         }
+        $result = null;
         try {
             $result = Pay::wechat($config)->h5($order);
         } catch (\Yansongda\Artful\Exception\InvalidResponseException $e) {
@@ -556,7 +584,7 @@ class PayService
         }
 
         $h5_url = $result->h5_url;
-        if (empty($qr)) {
+        if (empty($h5_url)) {
             Log::error('微信扫码下单失败！');
             Log::write($result->toArray());
             return [
@@ -568,6 +596,8 @@ class PayService
         //记录订单
         $order = [
             'id' => $out_trade_no,
+            'scene' => $scene,
+            'userid' => $userid,
             'orderid' => $orderid,
             'method' => 'wechat',
             'modeid' => $modeid,
@@ -606,12 +636,12 @@ class PayService
      * @return array
 
      */
-    public function  getQRcode(int $modeid, int $type, float $amount, string $orderid, string $subject)
+    public function  getQRcode(int $modeid, int $scene, int $userid, int $type, float $amount, string $orderid, string $subject): array
     {
         if ($type == 1) {
-            $ret = $this->wxScanpay($orderid, $amount, $subject, $modeid);
+            $ret = $this->wxScanpay($orderid, $scene, $userid, $amount, $subject, $modeid);
         } else if ($type == 2) {
-            $ret = $this->aliScanpay($orderid, $amount, $subject, $modeid);
+            $ret = $this->aliScanpay($orderid, $scene, $userid, $amount, $subject, $modeid);
         } else {
             return [
                 'code' => 1,
@@ -632,7 +662,7 @@ class PayService
         ];
     }
 
-    public function paySucess(string $payid)
+    public function paySucess(string $payid): array
     {
         $payorder = PayRecordModel::where('id', $payid)->find();
         if (empty($payorder)) {
@@ -649,35 +679,71 @@ class PayService
                 'msg' => '该订单已支付已经处理完成！'
             ];
         }
-        $checkOrder = CheckOrderModel::where("id", $payorder->orderid)->find();
-        if (empty($checkOrder)) {
-            Log::error("用户支付成功，该订单不存在！payid=" . $payid);
-            return [
-                'code' => 1,
-                'msg' => '该订单不存在！'
-            ];
-        }
-        $now = date('Y-m-d H:i:s');
-        $spayid = substr($payid, 0, 4) . "*****" . substr($payid, -4);
-        CheckOrderModel::where("id", $payorder->orderid)->update(['status' => 4, 'payid' => $payid, 'spayid' => $spayid, 'pay_time' => $now, 'update_time' => $now]);
-        PayRecordModel::where('id', $payid)->update(['status' => 1, 'update_time' => $now]);
-        //记录收入
-        $user = UserModel::where("id", $checkOrder->userid)->find();
-        if (!empty($user)) {
-           $user->increaseBalance($checkOrder->profit,1,$checkOrder->id);
-        }
-        //支付订单
-        $ret =  (new Check())->payOrder($checkOrder->id, $checkOrder->title, $checkOrder->author, $checkOrder->end_date, $checkOrder->school_id, $checkOrder->class_code, $checkOrder->class_type);
-        if ($ret['code'] == 0) {
-            CheckOrderModel::where("id", $payorder->orderid)->update(['status' => 5, 'update_time' => date('Y-m-d H:i:s')]);
+        if ($payorder->scene == 1) {
+            $checkOrder = CheckOrderModel::where("id", $payorder->orderid)->find();
+            if (empty($checkOrder)) {
+                Log::error("用户支付成功，该订单不存在！payid=" . $payid);
+                return [
+                    'code' => 1,
+                    'msg' => '该订单不存在！'
+                ];
+            }
+            $now = date('Y-m-d H:i:s');
+            $spayid = substr($payid, 0, 4) . "*****" . substr($payid, -4);
+            CheckOrderModel::where("id", $payorder->orderid)->update(['status' => 4, 'payid' => $payid, 'spayid' => $spayid, 'pay_time' => $now, 'update_time' => $now]);
+            PayRecordModel::where('id', $payid)->update(['status' => 1, 'update_time' => $now]);
+            //记录收入
+            $user = UserModel::where("id", $checkOrder->userid)->find();
+            if (!empty($user)) {
+                $user->increaseBalance($checkOrder->profit, 1, $checkOrder->id);
+                UserModel::where("id", $checkOrder->userid)->inc('money', $checkOrder->profit)->update();
+            }
+            if (!empty($user->tid)) {
+                $tuser = UserModel::where("id", $user->tid)->find();
+                if (!empty($tuser)) {
+                    $tuser->increaseBalance($checkOrder->tprofit, 1, $checkOrder->id,'邀请奖励(销售:' . $checkOrder->userid . ')');
+                    UserModel::where("id", $checkOrder->tid)->inc('money', $checkOrder->tprofit)->update();
+                    UserModel::where("id", $checkOrder->userid)->inc('tmoney', $checkOrder->tprofit)->update();
+                }
+            }
+            //支付订单
+            $ret =  (new Check())->payOrder($checkOrder->id, $checkOrder->title, $checkOrder->author, $checkOrder->end_date, $checkOrder->school_id, $checkOrder->class_code, $checkOrder->class_type);
+            if ($ret['code'] == 0) {
+                CheckOrderModel::where("id", $payorder->orderid)->update(['status' => 5, 'update_time' => date('Y-m-d H:i:s')]);
+                return [
+                    'code' => 0,
+                    'msg' => ''
+                ];
+            } else {
+                Log::error($payorder->orderid . " 订单付款失败-" . $ret['msg']);
+            }
+        } else if ($payorder->scene == 2) {
+            //积分充值
+            $amount = bcmul($payorder->price, 100, 0);
+            $now = date('Y-m-d H:i:s');
+            $user = UserModel::where("id", $payorder->userid)->find();
+            if (empty($user)) {
+                Log::error("用户支付成功，该用户不存在！payid=" . $payid);
+                return [
+                    'code' => 1,
+                    'msg' => '该用户不存在！'
+                ];
+            }
+            $user->increasePoints($amount, 1, $payorder->id);
+            PayRecordModel::where('id', $payorder->id)->update(['status' => 1, 'update_time' => date('Y-m-d H:i:s')]);
         } else {
-            Log::error($payorder->orderid . " 订单付款失败-" . $ret['msg']);
+            Log::error($payorder->id . "订单支付成功，但是订单场景不支持");
         }
+        return [
+            'code' => 1,
+            'msg' => '订单付款失败'
+        ];
     }
 
-    public function refund(string $payid)
+    public function refund(string $payid): array
     {
         $ret = [];
+        $orderid = "";
         $payRecord = PayRecordModel::where("id", $payid)->find();
         if (empty($payRecord)) {
             return [
@@ -685,24 +751,34 @@ class PayService
                 'msg' => "支付记录不存在",
             ];
         }
+        $orderid = $payRecord->orderid;
         if ($payRecord->method == "alipay") {
             $ret =  $this->aliRefund($payRecord->id, $payRecord->price, $payRecord->modeid, $payRecord->type);
         } else if ($payRecord->method == "wechat") {
             $ret =  $this->wxRefund($payRecord->id, $payRecord->price, $payRecord->modeid, $payRecord->type);
         }
-         if ($ret['code'] != 0) {
+        if ($ret['code'] != 0) {
             return $ret;
-         }
-         CheckOrderModel::where(["id" => $payRecord->orderid])->update(["status" => 9, "update_time" => date('Y-m-d H:i:s')]);
-         $order = CheckOrderModel::where(["id" => $payRecord->orderid])->find();
-         if(empty($order)){
-             return $ret;
-         }
-         $user = UserModel::where('id',$order->userid)->find();
-         if(empty($user)){
+        }
+        CheckOrderModel::where(["id" => $orderid])->update(["status" => 9, "update_time" => date('Y-m-d H:i:s')]);
+        $order = CheckOrderModel::where(["id" => $orderid])->find();
+        if (empty($order)) {
             return $ret;
-         }
-         $user->decreaseBalance($order->profit,3,$order->id,'订单退款');
-         return $ret;
+        }
+        $user = UserModel::where('id', $order->userid)->find();
+        if (empty($user)) {
+            return $ret;
+        }
+        $user->decreaseBalance($order->profit, 3, $order->id, '订单退款');
+        UserModel::where("id", $order->userid)->dec('money', $order->profit)->update();
+        if (!empty($user->tid)) {
+            $tuser = UserModel::where('id', $user->tid)->find();
+            if (!empty($tuser)) {
+                $tuser->decreaseBalance($order->tprofit, 3, $order->id, '订单退款-推荐奖励扣除(' . $user->id . ")");
+                UserModel::where("id", $order->tid)->dec('money', $order->tprofit)->update();
+                UserModel::where("id", $order->userid)->dec('tmoney', $order->tprofit)->update();
+            }
+        }
+        return $ret;
     }
 }

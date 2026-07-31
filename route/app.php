@@ -28,3 +28,13 @@ Route::group('notify', function () {
     Route::rule('alipay/:modeid', "Notify/alipay");
     Route::rule('wxpay/:modeid', "Notify/wxpay");
 });
+
+Route::group('agisoAcprSupplierApi', function () {
+    Route::rule('app/getAppId', "AgisoAcprSupplierApi/getAppId");
+    Route::rule('product/getList', "AgisoAcprSupplierApi/getList");
+    Route::rule('product/getTemplate', "AgisoAcprSupplierApi/getTemplate");
+    Route::rule('order/createPurchase', "AgisoAcprSupplierApi/createPurchase");
+    Route::rule('order/cancelOrder', "AgisoAcprSupplierApi/cancelOrder");
+    Route::rule('order/createRecharge', "AgisoAcprSupplierApi/createRecharge");
+    Route::rule('order/get', "AgisoAcprSupplierApi/orderGet");
+});

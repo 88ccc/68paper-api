@@ -6,6 +6,7 @@ use app\BaseController;
 use app\model\AdminModel;
 use app\model\ArticleModel;
 use app\model\AttachModel;
+use app\model\BalanceModel;
 use app\model\CheckModel;
 use app\model\CheckOrderModel;
 use app\model\PayRecordModel;
@@ -17,6 +18,7 @@ use think\facade\Log;
 use app\model\SmsModel;
 use app\model\EmailModel;
 use app\model\UserWebModel;
+use app\model\WithdrawModel;
 use app\service\CheckService;
 use app\supplier\Check;
 use app\service\PayService;
@@ -26,7 +28,6 @@ use think\facade\Config;
 
 class Index extends BaseController
 {
-    private $is_test = false; ////是否是演示平台  正式使用时应该设置为false
     public function index()
     {
         return '欢迎使用 V2.0.0';
@@ -72,7 +73,7 @@ class Index extends BaseController
                 'id' => $user->id,
                 'token' => $token['jwt'],
                 'name' => $user->name,
-                'avatar' => $user->getAvatar($this->request->domain())
+                'avatar' => $user->avatar
             ]
 
         ]);
@@ -86,6 +87,56 @@ class Index extends BaseController
             return json([
                 'code' => 10000,
                 'msg' => '请先配置自定义信息'
+            ]);
+        } else {
+            return json([
+                'code' => 0,
+                'data' => $config
+            ]);
+        }
+    }
+
+    public function getSaleWebConfig()
+    {
+        $config = ConfigService::get("sale_web");
+        if (empty($config)) {
+            return json([
+                'code' => 10000,
+                'msg' => '请先配置销售网站信息'
+            ]);
+        } else {
+            return json([
+                'code' => 0,
+                'data' => $config
+            ]);
+        }
+    }
+
+    public function getInviteConfig()
+    {
+
+        $config = ConfigService::get("invite");
+        if (empty($config)) {
+            return json([
+                'code' => 10000,
+                'msg' => '请先配置邀请信息'
+            ]);
+        } else {
+            return json([
+                'code' => 0,
+                'data' => $config
+            ]);
+        }
+    }
+
+    public function getExtensionsConfig()
+    {
+
+        $config = ConfigService::get("extensions");
+        if (empty($config)) {
+            return json([
+                'code' => 10000,
+                'msg' => '请先配置邀请信息'
             ]);
         } else {
             return json([
@@ -136,8 +187,27 @@ class Index extends BaseController
         } else {
             $list['data']['wechat'] = false;
         }
-        $frontend = Config::get('website.frontend_domain');
-        $list['data']['frontend'] = $frontend;
+        $config5 = ConfigService::get("sale_web");
+        if (!empty($config5)) {
+            $list['data']['saleWeb'] = $config5;
+        }
+        $config6 = ConfigService::get("invite");
+        if (!empty($config6)) {
+            $list['data']['invite'] = $config6;
+        }
+        $adminUrl = Config::get('website.admin_domain');
+        if (!empty($adminUrl)) {
+            $list['data']['adminUrl'] = $adminUrl;
+        }
+        $config7 = ConfigService::get("function");
+        if (!empty($config7)) {
+            $list['data']['function'] = $config7;
+        }
+        $list['data']['ecommerce'] = false;
+        $config8 = ConfigService::get("91kaj");
+        if (!empty($config8)) {
+            $list['data']['ecommerce'] = strtolower($config8['test']) != 'true';
+        }
 
         return json($list);
     }
@@ -277,7 +347,7 @@ class Index extends BaseController
 
     public function getPayQRcode()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '测试环境不支持'
@@ -389,14 +459,14 @@ class Index extends BaseController
                 'msg' => "产品不能使用"
             ]);
         }
-        $subject = $check->name;
-        $ret = (new PayService())->getQRcode($data['modeid'], $type, $amount, $data['orderid'], $subject);
+        $subject = $check->name . "(销售:" . $order->userid . ")";
+        $ret = (new PayService())->getQRcode($data['modeid'], 1, $order->userid, $type, $amount, $data['orderid'], $subject);
         return json($ret);
     }
 
     public function getH5Pay()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '测试环境不支持'
@@ -508,7 +578,7 @@ class Index extends BaseController
                 'msg' => "产品不能使用"
             ]);
         }
-        $subject = $check->name;
+        $subject = $check->name . "(销售:" . $order->userid . ")";
         $ret = [];
         $return_url = "";
         if (!empty($data['returnUrl'])) {
@@ -516,9 +586,9 @@ class Index extends BaseController
         }
         if ($type == 1) {
             $ip = $this->request->ip();
-            $ret = (new PayService())->wxH5pay($data['orderid'], $amount, $subject, $data['modeid'], $ip);
+            $ret = (new PayService())->wxH5pay($data['orderid'], 1, $order->userid, $amount, $subject, $data['modeid'], $ip);
         } else if ($type == 2) {
-            $ret = (new PayService())->aliH5pay($data['orderid'], $amount, $subject, $data['modeid'], $return_url);
+            $ret = (new PayService())->aliH5pay($data['orderid'], 1, $order->userid, $amount, $subject, $data['modeid'], $return_url);
         }
 
         return json($ret);
@@ -527,7 +597,7 @@ class Index extends BaseController
     //微信内部，jsap支付
     public function getMPpay()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '测试环境不支持'
@@ -645,9 +715,9 @@ class Index extends BaseController
                 'msg' => '缺少参数openid'
             ]);
         }
-        $subject = $check->name;
+        $subject = $check->name . "(销售:" . $order->userid . ")";
         $ret = [];
-        $ret = (new PayService())->wxMPpay($data['orderid'], $amount, $subject, $data['modeid'], $data['openid']);
+        $ret = (new PayService())->wxMPpay($data['orderid'], 1, $order->userid, $amount, $subject, $data['modeid'], $data['openid']);
         return json($ret);
     }
 
@@ -933,8 +1003,9 @@ class Index extends BaseController
                 'name' => $user->name,
                 'phone' => $user->mobile,
                 'email' => $user->email,
-                'avatar' => $user->getAvatar($this->request->domain()),
+                'avatar' => $user->avatar,
                 'domain' => $domain,
+                'pay_type' => $user->pay_type
             ]
 
         ]);
@@ -1093,6 +1164,41 @@ class Index extends BaseController
             'data' => $notice->content
         ]);
     }
+    public function getPrivacyPolicy()
+    {
+        $articl = ArticleModel::where('id', 'privacyPolicy')->find();
+        if (empty($articl)) {
+            return json([
+                'code' => 0,
+                'msg' => '',
+                'data' => ''
+            ]);
+        }
+
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => $articl->content
+        ]);
+    }
+
+    public function getUserAgreement()
+    {
+        $articl = ArticleModel::where('id', 'userAgreement')->find();
+        if (empty($articl)) {
+            return json([
+                'code' => 0,
+                'msg' => '',
+                'data' => ''
+            ]);
+        }
+
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => $articl->content
+        ]);
+    }
 
     public function getWithdrawConfig()
     {
@@ -1132,10 +1238,10 @@ class Index extends BaseController
         //处理供货失败的订单
         $flag =  Cache::get('syncorder');
         if (!empty($flag)) {
-            //四分钟内处理过
+            //三分钟内处理过
             return;
         }
-        Cache::set('syncorder', "1", 240);
+        Cache::set('syncorder', "1", 180);
         $time = date("Y-m-d H:i:s", strtotime("-5 minute"));
         $orders = CheckOrderModel::where([
             ['status', 'in', [4, 6]]
@@ -1183,10 +1289,34 @@ class Index extends BaseController
 
     public function clearReport()
     {
+        $check = 1;
+        $amount = 1;
+        $config = ConfigService::get("cache_set");
+        if (!empty($config)) {
+            if (isset($config['check'])) {
+                $temp = intval($config['check']);
+                if ($temp > $check) {
+                    $check = $temp;
+                }
+            }
+            if (isset($config['amount'])) {
+                $temp = intval($config['amount']);
+                if ($temp > $amount) {
+                    $amount = $temp;
+                }
+            }
+        }
         //删除2年前的记录
-        $time = date("Y-m-d H:i:s", strtotime("-2 year"));
-        CheckOrderModel::whereTime('create_time', '<', $time)->delete();
+        $time = date("Y-m-d H:i:s", strtotime("-" . $check . " year"));
+        CheckOrderModel::whereTime('update_time', '<', $time)->delete();
         PayRecordModel::whereTime('create_time', '<', $time)->delete();
+        EmailModel::whereTime('update_time', '<', $time)->delete();
+        SmsModel::whereTime('update_time', '<', $time)->delete();
+        //删除5年前的记录
+        $time = date("Y-m-d H:i:s", strtotime("-" . $amount . " year"));
+        BalanceModel::whereTime('create_time', '<', $time)->delete();
+        WithdrawModel::whereTime('create_time', '<', $time)->delete();
+
         //删除7天前的报告
         (new StorageService())->clean_report();
         echo "Success";

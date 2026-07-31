@@ -8,13 +8,20 @@ use app\model\EmailModel;
 use app\model\SmsModel;
 use app\model\BalanceModel;
 use app\model\AttachModel;
+use app\model\CardModel;
 use app\model\CheckModel;
 use app\model\CheckOrderModel;
+use app\model\PointsModel;
 use app\model\UserCheckModel;
+use app\model\UserNoticeModel;
 use app\model\UserWebModel;
 use app\model\WithdrawModel;
 use think\exception\FileException;
 use app\service\ConfigService;
+use think\facade\Config;
+use app\service\PayService;
+use app\service\CardService;
+use think\facade\Log;
 
 class Console extends BaseController
 {
@@ -42,8 +49,9 @@ class Console extends BaseController
                 'name' => $user->name,
                 'phone' => $user->mobile,
                 'email' => $user->email,
-                'avatar' => $user->getAvatar($this->request->domain()),
-                'domain' => $domain
+                'avatar' => $user->avatar,
+                'domain' => $domain,
+                'pay_type' => $user->pay_type
             ]
 
         ]);
@@ -82,7 +90,7 @@ class Console extends BaseController
             ]);
         }
         $path = public_path() . '/static/images/avatar/';
-        $fileName = '' . $userid . $file_ex;
+        $fileName = '' . $userid . "." . $file_ex;
         $userAvatar = '/static/images/avatar/' . $fileName;
         try {
             $avatar->move($path, $fileName);
@@ -93,7 +101,7 @@ class Console extends BaseController
             ]);
         }
         if (!empty($user->avatar)) {
-            if (($user->avatar != '/static/images/avatar/default.png') && ($user->avatar != $userAvatar) && (file_exists(public_path() . $user->avatar))) {
+            if (($user->avatar != '/images/avatar/default.png') && ($user->avatar != $userAvatar) && (file_exists(public_path() . $user->avatar))) {
                 unlink(public_path() . $user->avatar);
             }
         }
@@ -102,7 +110,7 @@ class Console extends BaseController
             'code' => 0,
             'msg' => '上传成功',
             'data' => [
-                'avatar' => $user->getAvatar($this->request->domain())
+                'avatar' => $user->avatar
             ]
         ]);
     }
@@ -299,6 +307,48 @@ class Console extends BaseController
         return json($list);
     }
 
+    public function getPoints()
+    {
+        $userid = $this->request->userid;
+        $user = UserModel::where('id', $userid)->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => '用户不存在'
+            ]);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '获取成功',
+            'data' => [
+                'points' => $user->points
+            ]
+        ]);
+    }
+    public function getPointsList()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $userid = $this->request->userid;
+        $where = [
+            'user_id' => $userid
+        ];
+        $oid = $this->request->get('oid');
+        if (!empty($oid)) {
+            $where['business_no'] = $oid;
+        }
+        $page = input("get.page") ? input("get.page") : 1;
+        $page = intval($page);
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = PointsModel::where($where)->count();
+        $data = PointsModel::where($where)->order('create_time', 'desc')->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $data;
+        return json($list);
+    }
+
     public function attachment_upload()
     {
         $userid = $this->request->userid;
@@ -434,11 +484,16 @@ class Console extends BaseController
         $list["msg"] = "";
         $page = input("get.page") ? input("get.page") : 1;
         $limit = input("get.limit") ? input("get.limit") : 1;
+        $pid = input("get.pid") ? input("get.pid") : "";
         $page = intval($page);
         $limit = intval($limit);
         $start = $limit * ($page - 1);
-        $count = CheckModel::count();
-        $products = CheckModel::limit($start, $limit)->select();
+        $where = [];
+        if (!empty($pid)) {
+            $where[] = ['id', '=', $pid];
+        }
+        $count = CheckModel::where($where)->count();
+        $products = CheckModel::where($where)->limit($start, $limit)->select();
         $data = [];
         foreach ($products as $product) {
             $up = UserCheckModel::where(['userid' => $userid, 'product_id' => $product->id])->find();
@@ -447,7 +502,7 @@ class Console extends BaseController
                 $up->userid = $userid;
                 $up->product_id = $product->id;
                 $up->unit = $product->unit;
-                $up->price = max($product->mini_price, $product->mini_price, $product->price);
+                $up->price = max($product->mini_price, $product->low_price, $product->price);
                 if ($product->supplier_status == 1 || $product->status == 1) {
                     $up->status = 1;
                 } else {
@@ -460,7 +515,9 @@ class Console extends BaseController
                 'name' => $product->name,
                 'cost' => $product->price,
                 'price' => $up->price,
-                'unit' => $up->unit,
+                'reward' => $product->reward,
+                'unit' => $product->unit,
+                'punit' => $product->unit,
                 'mini_price' => $product->mini_price,
                 'status' => $up->status,
                 'remark' => $product->remark,
@@ -478,6 +535,7 @@ class Console extends BaseController
         $data = request()->post();
         $product_id = $data['id'];
         $price = 0;
+        $unit = 0;
         $status = 0;
         $up = UserCheckModel::where(['userid' => $userid, 'product_id' => $product_id])->find();
         if (empty($up)) {
@@ -499,13 +557,18 @@ class Console extends BaseController
         } else {
             $price = intval($data['price']);
         }
-        if ($price < $check->price) {
+
+
+        $costPrice = $check->price;
+        $minPrice = $check->mini_price;
+
+        if ($price < $costPrice) {
             return json([
                 'code' => 1,
                 'msg' => '售价不能低于供货价'
             ]);
         }
-        if ($price < $check->mini_price) {
+        if ($price < $minPrice) {
             return json([
                 'code' => 1,
                 'msg' => '售价不能低于最低售价'
@@ -525,7 +588,7 @@ class Console extends BaseController
                 'msg' => '状态值不正确'
             ]);
         }
-        UserCheckModel::where(['userid' => $userid, 'product_id' => $product_id])->update(['price' => $price, 'status' => $status]);
+        UserCheckModel::where(['userid' => $userid, 'product_id' => $product_id])->update(['price' => $price, 'unit' => $check->unit, 'status' => $status]);
         $list['code'] = 0;
         $list['msg'] = '更新成功';
         return json($list);
@@ -629,9 +692,23 @@ class Console extends BaseController
         if (!empty($payid)) {
             $where[] = ['payid', 'LIKE', "%" . $payid . "%"];
         }
-        $where[] = ['userid', '=', $userid];
-        $count = CheckOrderModel::where($where)->count();
-        $products = CheckOrderModel::where($where)->withoutField('original,pcost,ppiece,pprofit,lock,file_key,report_url,payid,lock_time')->order('create_time', 'desc')->limit($start, $limit)->select();
+
+        $count = CheckOrderModel::where(function ($query) use ($userid) {
+            $query->whereOr([[
+                ['tid', '=', $userid],
+                ['status', '>', 4]
+            ], [
+                ['userid', '=', $userid]
+            ]]);
+        })->where($where)->count();
+        $products = CheckOrderModel::where(function ($query) use ($userid) {
+            $query->whereOr([[
+                ['tid', '=', $userid],
+                ['status', '>', 4]
+            ], [
+                ['userid', '=', $userid]
+            ]]);
+        })->where($where)->withoutField('original,pcost,ppiece,pprofit,lock,file_key,report_url,payid,lock_time')->order('create_time', 'desc')->limit($start, $limit)->select();
         $list["count"] = $count;
         $list["data"] = $products;
         return json($list);
@@ -712,6 +789,33 @@ class Console extends BaseController
                 'msg' => '请先设置 检测链接 再来设置客服'
             ]);
         }
+
+        $pattern = '/^[a-zA-Z0-9_\-+]{3,20}$/';
+        if (!empty($phone)) {
+            if (!(preg_match($pattern, $phone) === 1)) {
+                return json([
+                    'code' => 1,
+                    'msg' => '电话号码格式非法'
+                ]);
+            }
+        }
+        if (!empty($wechat)) {
+            if (!(preg_match($pattern, $wechat) === 1)) {
+                return json([
+                    'code' => 1,
+                    'msg' => '微信号格式非法'
+                ]);
+            }
+        }
+        if (!empty($qq)) {
+            if (!(preg_match($pattern, $qq) === 1)) {
+                return json([
+                    'code' => 1,
+                    'msg' => 'qq号格式非法'
+                ]);
+            }
+        }
+
         UserWebModel::where('userid', $userid)->update(['qq' => $qq, 'wechat' => $wechat, 'phone' => $phone]);
         return json([
             'code' => 0,
@@ -820,6 +924,689 @@ class Console extends BaseController
         return json([
             'code' => 0,
             'msg' => '提交成功，请等待审核'
+        ]);
+    }
+
+    public function getInviteData()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $userid = $this->request->userid;
+        $page = input("get.page") ? input("get.page") : 1;
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $page = intval($page);
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = UserModel::where("tid", $userid)->count();
+        $data = UserModel::where("tid", $userid)->field("id,tid,regtime,tmoney,status")->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $data;
+        return json($list);
+    }
+
+    public function setPayType()
+    {
+        $userid = $this->request->userid;
+        $paystr = request()->post("pay_type");
+        if (empty($paystr)) {
+            return json([
+                'code' => 1,
+                'msg' => '必须至少选择一种支付方式'
+            ]);
+        }
+        $pay_type = "";
+        $allpay = ['alipay', 'wechat', 'card'];
+        $payarr = explode(",", $paystr);
+        foreach ($payarr as $key => $value) {
+            if (!in_array($value, $allpay)) {
+                return json([
+                    'code' => 1,
+                    'msg' => '不支持的支付方式' . $value
+                ]);
+            }
+            if (empty($pay_type)) {
+                $pay_type = $value;
+            } else {
+                $pay_type = $pay_type . "," . $value;
+            }
+        }
+        UserModel::where("id", $userid)->update(['pay_type' => $pay_type]);
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => $pay_type,
+        ]);
+    }
+
+    public function getPayQRcode()
+    {
+        $userid = $this->request->userid;
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '测试环境不支持'
+            ]);
+        }
+        $data = $this->request->post();
+        if (!isset($data['type'])) {
+            return json([
+                'code' => 1,
+                'msg' => '类型不能为空'
+            ]);
+        }
+        //金额
+        if (!isset($data['amount'])) {
+            return json([
+                'code' => 10005,
+                'msg' => '金额不能为空'
+            ]);
+        }
+        if ($data['amount'] <= 0) {
+            return json([
+                'code' => 10006,
+                'msg' => '金额错误'
+            ]);
+        }
+        if (!isset($data['modeid'])) {
+            return json([
+                'code' => 10009,
+                'msg' => '模版id不能为空'
+            ]);
+        }
+        //判断金额是否为数字，紧紧支持两位小数
+        if (!is_numeric($data['amount'])) {
+            return json([
+                'code' => 10007,
+                'msg' => '金额错误'
+            ]);
+        }
+        //点的位置
+        $pos = strpos($data['amount'], '.');
+        if ($pos === false) {
+            $pos = strlen($data['amount']);
+        }
+        //判断小数点后两位
+        if (strlen($data['amount']) - $pos - 1 > 2) {
+            $len = strlen($data['amount']);
+            return json([
+                'code' => 10008,
+                'msg' => '仅仅支持两位小数' . $len . "-" . $pos,
+            ]);
+        }
+        $amount = floatval($data['amount']);
+
+
+        if ($data['type'] == 'wechat') {
+            $type = 1; //微信支付
+        } else if (($data['type'] == 'alipay')) {
+            $type = 2; //支付宝支付
+        } else {
+            return json([
+                'code' => 10010,
+                'msg' => '不支持的支付方式'
+            ]);
+        }
+        if ($amount <= 0) {
+            return json([
+                'code' => 10011,
+                'msg' => '金额错误'
+            ]);
+        }
+
+        $subject = "预充值";
+        $ret = (new PayService())->getQRcode($data['modeid'], 2, $userid, $type, $amount, '', $subject);
+        return json($ret);
+    }
+
+    public function getH5Pay()
+    {
+        $userid = $this->request->userid;
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '测试环境不支持'
+            ]);
+        }
+        $data = $this->request->post();
+        if (!isset($data['type'])) {
+            return json([
+                'code' => 1,
+                'msg' => '类型不能为空'
+            ]);
+        }
+
+        //金额
+        if (!isset($data['amount'])) {
+            return json([
+                'code' => 10005,
+                'msg' => '金额不能为空'
+            ]);
+        }
+        if ($data['amount'] <= 0) {
+            return json([
+                'code' => 10006,
+                'msg' => '金额错误'
+            ]);
+        }
+        if (!isset($data['modeid'])) {
+            return json([
+                'code' => 10009,
+                'msg' => '模版id不能为空'
+            ]);
+        }
+        //判断金额是否为数字，紧紧支持两位小数
+        if (!is_numeric($data['amount'])) {
+            return json([
+                'code' => 10007,
+                'msg' => '金额错误'
+            ]);
+        }
+        //点的位置
+        $pos = strpos($data['amount'], '.');
+        if ($pos === false) {
+            $pos = strlen($data['amount']);
+        }
+        //判断小数点后两位
+        if (strlen($data['amount']) - $pos - 1 > 2) {
+            $len = strlen($data['amount']);
+            return json([
+                'code' => 10008,
+                'msg' => '仅仅支持两位小数' . $len . "-" . $pos,
+            ]);
+        }
+        $amount = floatval($data['amount']);
+
+
+        if ($data['type'] == 'wechat') {
+            $type = 1; //微信支付
+        } else if (($data['type'] == 'alipay')) {
+            $type = 2; //支付宝支付
+        } else {
+            return json([
+                'code' => 10010,
+                'msg' => '不支持的支付方式'
+            ]);
+        }
+        if ($amount <= 0) {
+            return json([
+                'code' => 10011,
+                'msg' => '金额错误'
+            ]);
+        }
+
+        $subject = "预充值";
+        $ret = [];
+        $return_url = "";
+        if (!empty($data['returnUrl'])) {
+            $return_url = $data['returnUrl'];
+        }
+        if ($type == 1) {
+            $ip = $this->request->ip();
+            $ret = (new PayService())->wxH5pay('', 2, $userid, $amount, $subject, $data['modeid'], $ip);
+        } else if ($type == 2) {
+            $ret = (new PayService())->aliH5pay('', 2, $userid, $amount, $subject, $data['modeid'], $return_url);
+        }
+
+        return json($ret);
+    }
+
+    //微信内部，jsap支付
+    public function getMPpay()
+    {
+        $userid = $this->request->userid;
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '测试环境不支持'
+            ]);
+        }
+        $data = $this->request->post();
+        if (!isset($data['type'])) {
+            return json([
+                'code' => 1,
+                'msg' => '类型不能为空'
+            ]);
+        }
+        //金额
+        if (!isset($data['amount'])) {
+            return json([
+                'code' => 10005,
+                'msg' => '金额不能为空'
+            ]);
+        }
+        if ($data['amount'] <= 0) {
+            return json([
+                'code' => 10006,
+                'msg' => '金额错误'
+            ]);
+        }
+        if (!isset($data['modeid'])) {
+            return json([
+                'code' => 10009,
+                'msg' => '模版id不能为空'
+            ]);
+        }
+        //判断金额是否为数字，紧紧支持两位小数
+        if (!is_numeric($data['amount'])) {
+            return json([
+                'code' => 10007,
+                'msg' => '金额错误'
+            ]);
+        }
+        //点的位置
+        $pos = strpos($data['amount'], '.');
+        if ($pos === false) {
+            $pos = strlen($data['amount']);
+        }
+        //判断小数点后两位
+        if (strlen($data['amount']) - $pos - 1 > 2) {
+            $len = strlen($data['amount']);
+            return json([
+                'code' => 10008,
+                'msg' => '仅仅支持两位小数' . $len . "-" . $pos,
+            ]);
+        }
+        $amount = floatval($data['amount']);
+
+
+        if ($data['type'] == 'wechat') {
+            $type = 1; //微信支付
+        } else if (($data['type'] == 'alipay')) {
+            $type = 2; //支付宝支付
+        } else {
+            return json([
+                'code' => 10010,
+                'msg' => '不支持的支付方式'
+            ]);
+        }
+        if ($amount <= 0) {
+            return json([
+                'code' => 10011,
+                'msg' => '金额错误'
+            ]);
+        }
+
+        if (empty($data['openid'])) {
+            return json([
+                'code' => 1,
+                'msg' => '缺少参数openid'
+            ]);
+        }
+        $subject = "预充值";
+        $ret = [];
+        $ret = (new PayService())->wxMPpay('', 2, $userid, $amount, $subject, $data['modeid'], $data['openid']);
+        return json($ret);
+    }
+
+    public function createCheckCard()
+    {
+        $extensionsEnable = false;
+        $funConfig = ConfigService::get("function");
+        if (!empty($funConfig)) {
+            $extensionsEnable = strtolower($funConfig['extensions']) == 'true';
+        }
+        if (!$extensionsEnable) {
+            return json([
+                'code' => 1,
+                'msg' => '没有启用扩展功能'
+            ]);
+        }
+        $data = $this->request->post();
+        if (empty($data['piece'])) {
+            return json([
+                'code' => 1,
+                'msg' => '件数不能为空'
+            ]);
+        }
+        if (empty($data['product_id'])) {
+            return json([
+                'code' => 1,
+                'msg' => '产品ID不能为空'
+            ]);
+        }
+        $num = 1;
+        if (!empty($data['mun'])) {
+            $num = intval($data['mun']);
+        }
+        $remark = "";
+        if (!empty($data['remark'])) {
+            $remark = $data['remark'];
+        }
+        $userid = intval($this->request->userid);
+        for ($i = 0; $i < $num; $i++) {
+            $ret = (new CardService())->createCard($userid, $data['product_id'], $data['piece'], $remark);
+            if ($ret['code'] != 0) {
+                return json($ret);
+            }
+        }
+
+        return json([
+            'code' => 0,
+            'msg' => '创建成功'
+        ]);
+    }
+
+    public function getCardData()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $userid = $this->request->userid;
+        $page = input("get.page") ? input("get.page") : 1;
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $cardid = input("get.cardid") ? input("get.cardid") : '';
+        $orderid = input("get.orderid") ? input("get.orderid") : '';
+        $status = input("get.status") ? input("get.status") : '';
+        $where[] = ['userid', '=', $userid];
+        if (!empty($cardid)) {
+            $where[] = ['id', 'LIKE', '%' . $cardid . '%'];
+        }
+        if (!empty($orderid)) {
+            $where[] = ['order_id', 'LIKE', '%' . $orderid . '%'];
+        }
+        if (!empty($status)) {
+            $where[] = ['status', '=', $status];
+        }
+        $page = intval($page);
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = CardModel::where($where)->count();
+        $prdate = CardModel::where($where)->order('create_time', 'desc')->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $prdate;
+        return json($list);
+    }
+
+    public function disableCard()
+    {
+        $data = $this->request->post();
+        if (empty($data['cardid'])) {
+            return json([
+                'code' => 1,
+                'msg' => '卡号不能为空'
+            ]);
+        }
+        $userid = $this->request->userid;
+        $card = CardModel::where(['id' => $data['cardid']])->find();
+        if ($card->userid != $userid) {
+            return json([
+                'code' => 1,
+                'msg' => '这个检测卡不是你的，你不能禁用'
+            ]);
+        }
+        if ($card->status != 1) {
+            return json([
+                'code' => 1,
+                'msg' => '这个检测卡已经使用或者已经禁用，无法再禁用'
+            ]);
+        }
+        CardModel::where(['id' => $data['cardid'], 'userid' => $userid])->update([
+            'status' => 3
+        ]);
+        return json([
+            'code' => 0,
+            'msg' => ''
+        ]);
+    }
+
+    public function getCardKey()
+    {
+        $extensionsEnable = false;
+        $funConfig = ConfigService::get("function");
+        if (!empty($funConfig)) {
+            $extensionsEnable = strtolower($funConfig['extensions']) == 'true';
+        }
+        if (!$extensionsEnable) {
+            return json([
+                'code' => 1,
+                'msg' => '没有启用扩展功能'
+            ]);
+        }
+        $userid = $this->request->userid;
+        $user = UserModel::where('id', $userid)->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => '用户不存在'
+            ]);
+        }
+        $type = $this->request->get('verifyType');
+        $code = $this->request->get('code');
+        if ($type == 'email') {
+            $emailMode = new EmailModel();
+            $ret = $emailMode->verifyCode($user->email, $code);
+            if ($ret['code'] != 0) {
+                return json([
+                    'code' => 1,
+                    'msg' => "验证码错误"
+                ]);
+            }
+        } else if ($type == 'phone') {
+            $mobileMode = new SmsModel();
+            $ret = $mobileMode->verifyCode($user->mobile, $code);
+            if ($ret['code'] != 0) {
+                return json([
+                    'code' => 1,
+                    'msg' => "验证码错误"
+                ]);
+            }
+        }
+        $cardkey = $user->cardkey;
+        if (empty($cardkey)) {
+            $ret = (new CardService())->resetCardKey($userid);
+            if ($ret['code'] != 0) {
+                return json($ret);
+            } else {
+                $cardkey = $ret['data']['card_key'];
+            }
+        }
+        return json([
+            'code' => 0,
+            'msg' => '获取成功',
+            'data' => [
+                'cardkey' => $cardkey
+            ]
+        ]);
+    }
+
+    public function resetCardKey()
+    {
+        $userid = $this->request->userid;
+        $user = UserModel::where('id', $userid)->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => '用户不存在'
+            ]);
+        }
+        $ret = (new CardService())->resetCardKey($userid);
+        if ($ret['code'] != 0) {
+            return json($ret);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '重置成功',
+        ]);
+    }
+
+    public function getOtherSetting()
+    {
+        $userid = $this->request->userid;
+        $userweb = UserWebModel::where('userid', $userid)->find();
+        if (empty($userweb)) {
+            return json([
+                'code' => 1,
+                'msg' => '请先去”检测链接“中设置',
+                'data' => []
+            ]);
+        }
+        $showJoin = false;
+        if ($userweb->show_jc == 1) {
+            $showJoin = true;
+        }
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => [
+                'showJoin' => $showJoin
+            ]
+        ]);
+    }
+
+    public function setOtherSetting()
+    {
+        $userid = $this->request->userid;
+        $data = $this->request->post("config");
+        if (!empty($data['showJoin'])) {
+            $showJoin = strtolower($data['showJoin']) == 'true';
+            if ($showJoin) {
+                UserWebModel::where('userid', $userid)->update(['show_jc' => 1]);
+            } else {
+                UserWebModel::where('userid', $userid)->update(['show_jc' => 0]);
+            }
+        }
+        return json([
+            'code' => 0,
+            'msg' => "设置成功"
+        ]);
+    }
+
+    public function updateUserNotice()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $userid = $this->request->userid;
+        $data = request()->post();
+        $content = "";
+        if (empty($data['position'])) {
+            return json([
+                'code' => 1,
+                'msg' => 'position必须填写',
+            ]);
+        }
+
+
+        if (empty($data['content'])) {
+            return json([
+                'code' => 1,
+                'msg' => 'content必须填写',
+            ]);
+        } else {
+            $content = trim($data['content']);
+        }
+        $p = UserNoticeModel::where("position", $data['position'])->find();
+        if (empty($p)) {
+            UserNoticeModel::insert(['userid' => $userid, 'position' => $data['position'], 'conent' => $content, 'status' => 1, 'update_time' => date('Y-m-d H:i:s')]);
+        } else {
+            UserNoticeModel::where(['userid' => $userid, 'position' => $data['position']])->update(['status' => 1, 'conent' => $content, 'update_time' => date('Y-m-d H:i:s')]);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '设置成功',
+        ]);
+    }
+
+    public function delUserNotice()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $userid = $this->request->userid;
+        $data = request()->post();
+        if (empty($data['position'])) {
+            return json([
+                'code' => 1,
+                'msg' => 'position必须填写',
+            ]);
+        }
+        UserNoticeModel::where(['userid' => $userid, 'position' => $data['position']])->delete();
+        return json([
+            'code' => 0,
+            'msg' => '删除成功',
+        ]);
+    }
+
+    public function getUserNoticeData()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $userid = $this->request->userid;
+        $page = input("get.page") ? input("get.page") : 1;
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $page = intval($page);
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = UserNoticeModel::where("userid", $userid)->count();
+        $notices = UserNoticeModel::where("userid", $userid)->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $notices;
+        return json($list);
+    }
+
+    public function getSubscribeMsg()
+    {
+        $userid = $this->request->userid;
+        $user =  UserModel::where("id", $userid)->find();
+        $event = "";
+        $method = "";
+        $threshold = 0;
+        if (!empty($user)) {
+            if (!empty($user->alarm_method)) {
+                if (is_array($user->alarm_method)) {
+                    $event = $user->alarm_method['event'];
+                    $method = $user->alarm_method['method'];
+                } else {
+                    $event = $user->alarm_method->event;
+                    $method = $user->alarm_method->method;
+                }
+            }
+            if (!empty($user->alarm_threshold)) {
+                $threshold = $user->alarm_threshold;
+            }
+        }
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => [
+                'event' => $event,
+                'method' => $method,
+                'threshold' => $threshold
+            ]
+        ]);
+    }
+
+    public function setSubscribeMsg()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $userid = $this->request->userid;
+        $event = "";
+        $method = "";
+        $threshold = 0;
+        $data = request()->post();
+        if (!empty($data['event'])) {
+            $event = $data['event'];
+        }
+        if (!empty($data['method'])) {
+            $method = $data['method'];
+        }
+        if (!empty($data['threshold'])) {
+            $threshold = intval($data['threshold']);
+        }
+        UserModel::where("id", $userid)->update(['alarm_threshold' => $threshold, 'alarm_method' => ['event' => $event, 'method' => $method]]);
+        return json([
+            'code' => 0,
+            'msg' => '设置成功'
         ]);
     }
 }

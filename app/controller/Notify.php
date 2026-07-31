@@ -27,16 +27,21 @@ class Notify extends BaseController
         }
     }
 
-    public function wxpay($modeid)
+    public function wxpay(int $modeid): mixed
     {
         $payService = new PayService();
         $config = $payService->getConfig($modeid);
         if (empty($config)) {
             return "支付配置不存在";
         }
-        $pay = Pay::wechat($config);
-        $result = $pay->callback();
-        $ret = $result->toArray();
+        try {
+            $pay = Pay::wechat($config);
+            $result = $pay->callback();
+            $ret = $result->toArray();
+        } catch (\Exception $e) {
+            Log::error($e->getMessage());
+            return "处理失败";
+        }
         if (empty($ret)) {
             Log::error("无法获取支付结果");
             Log::error($result);
@@ -69,7 +74,7 @@ class Notify extends BaseController
         return $pay->success();
     }
 
-    public function alipay($modeid)
+    public function alipay(int $modeid): mixed
     {
         $payService = new PayService();
         $config = $payService->getConfig($modeid);

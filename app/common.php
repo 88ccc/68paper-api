@@ -30,3 +30,17 @@ function isInCommaSeparatedList(string $listStr, string $target): bool
     // 5. 严格判断目标是否在数组中（第三个参数true开启严格类型比较）
     return in_array($cleanTarget, $cleanItems, true);
 }
+
+function getNonceStr(int $len)
+{
+    static $characters = '023456789ABCDEFGHJKLMNOPQRSTUVWXYZ';
+    if ($len <= 0) {
+        $len = 32;
+    }
+    $charactersLength = strlen($characters);
+    $randomString = '';
+    for ($i = 0; $i < $len; $i++) {
+        $randomString .= $characters[rand(0, $charactersLength - 1)];
+    }
+    return $randomString;
+}

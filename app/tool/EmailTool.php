@@ -19,7 +19,6 @@ class EmailTool
     {
         $emailconfig = ConfigService::get("email");
         if (!empty($emailconfig)) {
-            Log::write($emailconfig);
             $this->mail = new PHPMailer(true);
             $this->mail->CharSet = "UTF-8";                     //设定邮件编码
             //Server settings
@@ -55,7 +54,7 @@ class EmailTool
         return $this->codeTemplate;
     }
 
-    public function send($toemail, $toname, $mailsubject, $mailbody, $attachment, $myname)
+    public function send(string $toemail,string $toname,string $mailsubject,string $mailbody,?string $attachment, $myname)
     {
         if (!$this->isInit) {
             return [

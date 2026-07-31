@@ -24,6 +24,5 @@ class WithdrawModel extends Model
         'status'  => 'int',//状态 1 等待处理 2 处理完成 3 处理失败
         'create_time'  => 'datetime', //创建时间
         'remark'=>'string',//备注
-
     ];
 }

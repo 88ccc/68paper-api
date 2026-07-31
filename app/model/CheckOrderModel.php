@@ -12,7 +12,7 @@ class CheckOrderModel extends Model
     protected $table = 'pt_check_order';
     // 模型数据表主键
     protected $pk = 'id';
-    protected $schema = [
+    protected array $schema = [
         'id'          => 'string',
         'userid' => 'int', //用户ID
         'tid' => 'int', //推荐人ID

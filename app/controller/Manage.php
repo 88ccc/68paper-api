@@ -6,6 +6,7 @@ use app\BaseController;
 use app\model\AdminModel;
 use app\model\ArticleModel;
 use app\model\AttachModel;
+use app\model\CardModel;
 use app\service\ConfigService;
 use app\service\WxPublicService;
 use think\facade\Log;
@@ -16,11 +17,22 @@ use app\model\CheckModel;
 use app\model\CheckOrderModel;
 use app\model\UserModel;
 use app\model\WithdrawModel;
+use app\model\ProductTipsModel;
+use app\model\UserNoticeModel;
+use app\model\BalanceModel;
+use app\model\EmailModel;
+use app\model\PayRecordModel;
+use app\model\PointsModel;
+use app\model\SmsModel;
+use app\model\UserCheckModel;
+use app\model\UserWebModel;
 use app\service\PayService;
+use think\facade\Config;
+use think\facade\Queue;
+use app\tool\QueueJob;
 
 class  Manage extends BaseController
 {
-    private $is_test = false; ////是否是演示平台  正式使用时应该设置为false
     public function adminInfo()
     {
         $userid = $this->request->userid;
@@ -37,7 +49,7 @@ class  Manage extends BaseController
             'data' => [
                 'id' => $user->id,
                 'name' => $user->name,
-                'avatar' => $user->getAvatar($this->request->domain()),
+                'avatar' => $user->avatar,
             ]
         ]);
     }
@@ -62,7 +74,7 @@ class  Manage extends BaseController
 
     public function setStorageConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -102,7 +114,7 @@ class  Manage extends BaseController
 
     public function setCustomConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -144,7 +156,7 @@ class  Manage extends BaseController
 
     public function clearWxPublicConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -166,7 +178,7 @@ class  Manage extends BaseController
                 'msg' => '请先配置微信信息'
             ]);
         } else {
-            if ($this->is_test) {
+            if (Config::get('website.is_test')) {
                 //演示网站
                 if (!empty($config['appid'])) {
                     $config['appid'] = 'wx5185******89';
@@ -184,7 +196,7 @@ class  Manage extends BaseController
 
     public function setWxPublicConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -205,9 +217,151 @@ class  Manage extends BaseController
         ]);
     }
 
+    public function setSaleWebConfig()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $config = $this->request->param('config');
+        if (empty($config)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写销售网站信息'
+            ]);
+        }
+        ConfigService::set('sale_web', $config, '销售网站配置');
+        return json([
+            'code' => 0,
+            'msg' => '设置成功'
+        ]);
+    }
+
+    public function setInviteConfig()
+    {
+
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $config = $this->request->param('config');
+        if (empty($config)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写邀请配置'
+            ]);
+        }
+        $yconfig = ConfigService::get("invite");
+        if (!empty($yconfig)) {
+            if ($yconfig['enable'] == $config['enable']) {
+                return json([
+                    'code' => 0,
+                    'msg' => '设置成功'
+                ]);
+            }
+        }
+
+        ConfigService::set('invite', $config, '邀请配置');
+        CheckModel::where('1=1')->update(['reward' => 0]);
+        $msg = "设置成功";
+        $str = trim(strtolower($config['enable']));
+        if ($str === 'true') {
+            $msg = "开启成功，请确保已在产品配置中设置了邀请奖励金额";
+        } else {
+            $msg = "关闭成功";
+        }
+        return json([
+            'code' => 0,
+            'msg' => $msg
+        ]);
+    }
+
+    public function setFunctionConfig()
+    {
+
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $config = $this->request->param('config');
+        if (empty($config)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写邀请配置'
+            ]);
+        }
+        ConfigService::set('function', $config, '功能设置');
+        $msg = "设置成功";
+        return json([
+            'code' => 0,
+            'msg' => $msg
+        ]);
+    }
+
+    public function setAgisoConfig()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $config = $this->request->param('config');
+        if (empty($config)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写配置'
+            ]);
+        }
+        ConfigService::set('91kaj', $config, '阿索奇标准货源');
+        $msg = "设置成功";
+        return json([
+            'code' => 0,
+            'msg' => $msg
+        ]);
+    }
+
+    public function getAgisoConfig()
+    {
+        $config = ConfigService::get("91kaj");
+        if (empty($config)) {
+            return json([
+                'code' => 10000,
+                'msg' => '请先配置存储信息'
+            ]);
+        } else {
+            return json([
+                'code' => 0,
+                'msg' => '',
+                'data' => $config
+            ]);
+        }
+    }
+
+    public function clearAgisoConfig()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        ConfigService::clear('91kaj');
+        return json([
+            'code' => 0,
+            'msg' => '清空成功'
+        ]);
+    }
+
     public function setPayMode()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -262,6 +416,7 @@ class  Manage extends BaseController
             $appid = $this->request->post('appId');
             $mchid = $this->request->post('mchId');
             $mchSecretKey = $this->request->post('mchSecretKey');
+            $pubkeyId = $this->request->post('pubKeyId');
             if (empty($appid)) {
                 return json([
                     'code' => 1,
@@ -288,6 +443,15 @@ class  Manage extends BaseController
             } else {
                 $mchSecretKey = trim($mchSecretKey);
                 $paymode->mchkey = $mchSecretKey;
+            }
+
+            if (empty($pubkeyId)) {
+                return json([
+                    'code' => 1,
+                    'msg' => '请填写微信支付公钥id'
+                ]);
+            } else {
+                $pubkeyId = trim($pubkeyId);
             }
 
             $files = request()->file();
@@ -364,6 +528,44 @@ class  Manage extends BaseController
                     return json([
                         'code' => 1,
                         'msg' => '请上传商户公钥证书'
+                    ]);
+                }
+            }
+
+            if (isset($files['pubkeyFile']) && (!empty($files['pubkeyFile']))) {
+                //检查文件大小
+                $file = $files['pubkeyFile'];
+                if ($file->getSize() > 5 * 1024 * 1024) {
+                    return json([
+                        'code' => 1,
+                        'msg' => '微信支付公钥证书大小不对'
+                    ]);
+                }
+                $file_ex = $file->getOriginalExtension();
+                if ($file_ex != 'pem') {
+                    return json([
+                        'code' => 1,
+                        'msg' => '微信支付公钥证书后缀不对'
+                    ]);
+                }
+                $fileName = $pubkeyId . '--' . $uniqidcode . '.' . $file_ex;
+                if (!empty($paymode->alipublicpath)) {
+                    $fileName =  $paymode->alipublicpath;
+                }
+                try {
+                    $file->move($certBasePath, $fileName);
+                } catch (\Exception $e) {
+                    return json([
+                        'code' => 1,
+                        'msg' => '微信支付公钥证书上传失败'
+                    ]);
+                }
+                $paymode->alipublicpath = $fileName;
+            } else {
+                if (!$isModify) {
+                    return json([
+                        'code' => 1,
+                        'msg' => '请上传微信支付公钥证书'
                     ]);
                 }
             }
@@ -599,18 +801,13 @@ class  Manage extends BaseController
     }
     public function deletePayMode()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
             ]);
         }
-        if ($this->is_test) {
-            return json([
-                'code' => 1,
-                'msg' => '演示网站不准设置'
-            ]);
-        }
+
         $id = input("post.id");
         if (empty($id)) {
             return json([
@@ -679,7 +876,7 @@ class  Manage extends BaseController
     }
     public function setPaySet()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -728,7 +925,7 @@ class  Manage extends BaseController
 
     public function editAdmin()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -782,7 +979,7 @@ class  Manage extends BaseController
                 ]);
             }
             if (!empty($admin->avatar)) {
-                if (($admin->avatar != '/static/images/avatar/default.png') && ($admin->avatar != $userAvatar) && (file_exists(public_path() . $admin->avatar))) {
+                if (($admin->avatar != '/images/avatar/default.png') && ($admin->avatar != $userAvatar) && (file_exists(public_path() . $admin->avatar))) {
                     unlink(public_path() . $admin->avatar);
                 }
             }
@@ -810,7 +1007,7 @@ class  Manage extends BaseController
 
     public function setCheckKeyConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -838,7 +1035,7 @@ class  Manage extends BaseController
                 'msg' => '请先配置检测秘钥'
             ]);
         } else {
-            if ($this->is_test) {
+            if (Config::get('website.is_test')) {
                 if (!empty($config['key'])) {
                     $config['key'] = 'fb45d*******986c2';
                 }
@@ -853,7 +1050,7 @@ class  Manage extends BaseController
     }
     public function clearCheckKeyConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1001,7 +1198,7 @@ class  Manage extends BaseController
 
     public function orderRefund()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1102,7 +1299,7 @@ class  Manage extends BaseController
 
     public function clearEmailConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1117,7 +1314,7 @@ class  Manage extends BaseController
 
     public function setWithdrawConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1146,9 +1343,9 @@ class  Manage extends BaseController
                 'msg' => '请先配置邮件信息'
             ]);
         } else {
-            if($this->is_test){
-                if(!empty($config['password'])){
-                    $config['password']="********";
+            if (Config::get('website.is_test')) {
+                if (!empty($config['password'])) {
+                    $config['password'] = "********";
                 }
             }
             return json([
@@ -1158,9 +1355,10 @@ class  Manage extends BaseController
             ]);
         }
     }
+
     public function setEmailConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1179,9 +1377,49 @@ class  Manage extends BaseController
             'msg' => '设置成功'
         ]);
     }
+
+    public function getCacheConfig()
+    {
+        $config = ConfigService::get("cache_set");
+        if (empty($config)) {
+            return json([
+                'code' => 10000,
+                'msg' => '请先配置缓存信息'
+            ]);
+        } else {
+            return json([
+                'code' => 0,
+                'msg' => '',
+                'data' => $config
+            ]);
+        }
+    }
+
+    public function setCacheConfig()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $config = $this->request->param('config');
+        if (empty($config)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写邮件配置'
+            ]);
+        }
+        ConfigService::set('cache_set', $config, '邮件配置');
+        return json([
+            'code' => 0,
+            'msg' => '设置成功'
+        ]);
+    }
+
     public function clearSmsConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1203,21 +1441,21 @@ class  Manage extends BaseController
                 'msg' => '请先配置短信信息'
             ]);
         } else {
-            if($this->is_test){
-                if(!empty($config['ali']['accessKeyId'])){
-                    $config['ali']['accessKeyId']="********";
+            if (Config::get('website.is_test')) {
+                if (!empty($config['ali']['accessKeyId'])) {
+                    $config['ali']['accessKeyId'] = "********";
                 }
-                if(!empty($config['ali']['accessKeySecret'])){
-                    $config['ali']['accessKeySecret']="********";
+                if (!empty($config['ali']['accessKeySecret'])) {
+                    $config['ali']['accessKeySecret'] = "********";
                 }
-                if(!empty($config['tencent']['accessKeyId'])){
-                    $config['tencent']['accessKeyId']="********";
+                if (!empty($config['tencent']['accessKeyId'])) {
+                    $config['tencent']['accessKeyId'] = "********";
                 }
-                if(!empty($config['tencent']['accessKeySecret'])){
-                    $config['tencent']['accessKeySecret']="********";
+                if (!empty($config['tencent']['accessKeySecret'])) {
+                    $config['tencent']['accessKeySecret'] = "********";
                 }
-                if(!empty($config['tencent']['signature'])){
-                    $config['tencent']['signature']="********";
+                if (!empty($config['tencent']['signature'])) {
+                    $config['tencent']['signature'] = "********";
                 }
             }
             return json([
@@ -1229,7 +1467,7 @@ class  Manage extends BaseController
     }
     public function setSmsConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1261,7 +1499,7 @@ class  Manage extends BaseController
     }
     public function setLoginRegisterConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1313,7 +1551,7 @@ class  Manage extends BaseController
     //修改用户状态
     public function editUserStatus()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1358,12 +1596,13 @@ class  Manage extends BaseController
     //修改用户金额
     public function editUserBalance()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
             ]);
         }
+        $businessNo = "";
         $data = request()->post();
         if (empty($data)) {
             return json([
@@ -1384,8 +1623,11 @@ class  Manage extends BaseController
             ]);
         }
         $remark = "管理员操作";
-        if (isset($data['remark'])) {
+        if (!empty($data['remark'])) {
             $remark = $data['remark'];
+        }
+        if (isset($data['businessNo'])) {
+            $businessNo = trim($data['businessNo']);
         }
         $amount = intval($data['amount']);
         if ($amount == 0) {
@@ -1416,7 +1658,7 @@ class  Manage extends BaseController
         }
         if ($amount < 0) {
             $p = abs($amount);
-            $ret = $user->decreaseBalance($p, $type, "",  $remark, 0, 2);
+            $ret = $user->decreaseBalance($p, $type, $businessNo,  $remark, 0, 2);
             if ($ret) {
                 return json([
                     'code' => 0,
@@ -1430,7 +1672,113 @@ class  Manage extends BaseController
             }
         } else {
             $p = abs($amount);
-            $ret = $user->increaseBalance($p, $type, "", $remark, 0, 2);
+            $ret = $user->increaseBalance($p, $type, $businessNo, $remark, 0, 2);
+            if ($ret) {
+                return json([
+                    'code' => 0,
+                    'msg' => '成功'
+                ]);
+            } else {
+                return json([
+                    'code' => 1,
+                    'msg' => '失败'
+                ]);
+            }
+        }
+    }
+    //修改用户积分
+    public function editUserPoints()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $businessNo = "";
+        $data = request()->post();
+        if (empty($data)) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写用户信息'
+            ]);
+        }
+        if (!isset($data['id'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写用户ID'
+            ]);
+        }
+        if (!isset($data['amount'])) {
+            return json([
+                'code' => 1,
+                'msg' => '请填写amount'
+            ]);
+        }
+        $remark = "管理员操作";
+        if (!empty($data['remark'])) {
+            $remark = $data['remark'];
+        }
+        if (isset($data['businessNo'])) {
+            $businessNo = trim($data['businessNo']);
+        }
+        $amount = intval($data['amount']);
+        if ($amount == 0) {
+            return json([
+                'code' => 0,
+                'msg' => '成功'
+            ]);
+        }
+        if (!isset($data['type'])) {
+            return json([
+                'code' => 1,
+                'msg' => '类型必须填入'
+            ]);
+        }
+        $type = intval($data['type']);
+        if ($type == 0) {
+            return json([
+                'code' => 1,
+                'msg' => '类型必须填入'
+            ]);
+        }
+        $user = UserModel::where('id', $data['id'])->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => '用户不存在'
+            ]);
+        }
+        if ($amount < 0) {
+            $p = abs($amount);
+            $befor_points = $user->points;
+            $ret = $user->decreasePoints($p, $type, $businessNo,  $remark, 0, 2);
+            if ($ret) {
+                if (!empty($user->alarm_threshold)) {
+                    if ($befor_points > $user->alarm_threshold) {
+                        if (($befor_points - $p) <= $user->alarm_threshold) {
+                            $data = [
+                                'job' => 'send_submsg',
+                                'userid' => $user->id,
+                                'event' => "points"
+                            ];
+                            Queue::push(QueueJob::class,  $data,  'default');
+                        }
+                    }
+                }
+                return json([
+                    'code' => 0,
+                    'msg' => '成功'
+                ]);
+            } else {
+                return json([
+                    'code' => 1,
+                    'msg' => '失败'
+                ]);
+            }
+        } else {
+            $p = abs($amount);
+            $ret = $user->increasePoints($p, $type, $businessNo, $remark, 0, 2);
             if ($ret) {
                 return json([
                     'code' => 0,
@@ -1448,7 +1796,7 @@ class  Manage extends BaseController
     //修改用户姓名
     public function editUserName()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1529,6 +1877,10 @@ class  Manage extends BaseController
         } else {
             $mini_price = intval($data['mini_price']);
         }
+        $reward = 0;
+        if (!empty($data['reward'])) {
+            $reward = intval($data['reward']);
+        }
         if ($price <= 0 || $mini_price <= 0) {
             return json([
                 'code' => 1,
@@ -1553,6 +1905,12 @@ class  Manage extends BaseController
                 'msg' => '供货价不能小于成本价'
             ]);
         }
+        if ($price - $reward < $check->cost) {
+            return json([
+                'code' => 1,
+                'msg' => '供货价减去奖励不能小于成本价,这样可能亏本'
+            ]);
+        }
         if (empty($data['remark'])) {
             $remark = "";
         } else {
@@ -1571,7 +1929,7 @@ class  Manage extends BaseController
                 'msg' => '状态错误'
             ]);
         }
-        CheckModel::where('id', $data['id'])->update(['price' => $price, 'mini_price' => $mini_price, 'status' => $status, 'remark' => $remark, 'update_time' => date('Y-m-d H:i:s')]);
+        CheckModel::where('id', $data['id'])->update(['price' => $price, 'mini_price' => $mini_price, 'reward' => $reward, 'status' => $status, 'remark' => $remark, 'update_time' => date('Y-m-d H:i:s')]);
         return json([
             'code' => 0,
             'msg' => '成功'
@@ -1597,7 +1955,7 @@ class  Manage extends BaseController
         $limit = intval($limit);
         $start = $limit * ($page - 1);
         $count = AttachModel::where($where)->count();
-        $prdate = AttachModel::where($where)->order('userid', 'asc')->limit($start, $limit)->select();
+        $prdate = AttachModel::where($where)->order('update_time', 'desc')->limit($start, $limit)->select();
         $list["count"] = $count;
         $list["data"] = $prdate;
         return json($list);
@@ -1628,7 +1986,7 @@ class  Manage extends BaseController
 
     public function setNotice()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1644,6 +2002,55 @@ class  Manage extends BaseController
             ]);
         } else {
             ArticleModel::where('id', 'notice')->update(['content' => $content, 'update_time' => date('Y-m-d H:i:s')]);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '修改成功'
+        ]);
+    }
+    public function setPrivacyPolicy()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $content = $this->request->post('content');
+        $article = ArticleModel::where('id', 'privacyPolicy')->find();
+        if (empty($article)) {
+            ArticleModel::insert([
+                'id' => 'privacyPolicy',
+                'content' => $content,
+                'update_time' => date('Y-m-d H:i:s')
+            ]);
+        } else {
+            ArticleModel::where('id', 'privacyPolicy')->update(['content' => $content, 'update_time' => date('Y-m-d H:i:s')]);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '修改成功'
+        ]);
+    }
+
+    public function setUserAgreement()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $content = $this->request->post('content');
+        $article = ArticleModel::where('id', 'userAgreement')->find();
+        if (empty($article)) {
+            ArticleModel::insert([
+                'id' => 'userAgreement',
+                'content' => $content,
+                'update_time' => date('Y-m-d H:i:s')
+            ]);
+        } else {
+            ArticleModel::where('id', 'userAgreement')->update(['content' => $content, 'update_time' => date('Y-m-d H:i:s')]);
         }
         return json([
             'code' => 0,
@@ -1698,7 +2105,7 @@ class  Manage extends BaseController
 
     public function withdrawHandle()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1759,6 +2166,12 @@ class  Manage extends BaseController
                 'msg' => '该提现记录的userid不对'
             ]);
         }
+        if ($withdraw->status != 1) {
+            return json([
+                'code' => 1,
+                'msg' => '已经处理，无需再处理'
+            ]);
+        }
         $status = intval($data['status']);
         $amount = intval($data['amount']);
         $charge = intval($data['charge']);
@@ -1792,6 +2205,23 @@ class  Manage extends BaseController
             }
         }
         WithdrawModel::where('id', $data['id'])->update(['charge' => $data['charge'], 'amount' => $data['amount'], 'status' => $status, 'remark' => $remark, 'do_time' => date('Y-m-d H:i:s')]);
+        if ($status == 2) {
+            //提现成功
+            $data = [
+                'job' => 'send_submsg',
+                'userid' => $user->id,
+                'event' => "txsucc"
+            ];
+            Queue::push(QueueJob::class,  $data,  'default');
+        } else if ($status == 3) {
+            //提现失败
+            $data = [
+                'job' => 'send_submsg',
+                'userid' => $user->id,
+                'event' => "txfail"
+            ];
+            Queue::push(QueueJob::class,  $data,  'default');
+        }
         return json([
             'code' => 0,
             'msg' => '成功'
@@ -1799,7 +2229,7 @@ class  Manage extends BaseController
     }
     public function setWebsiteConfig()
     {
-        if ($this->is_test) {
+        if (Config::get('website.is_test')) {
             return json([
                 'code' => 1,
                 'msg' => '演示网站不准设置'
@@ -1874,6 +2304,264 @@ class  Manage extends BaseController
         return json([
             'code' => 0,
             'msg' => '设置成功'
+        ]);
+    }
+
+    public function getUserInfo()
+    {
+        $userid = request()->get('userid');
+        if (empty($userid)) {
+            return json([
+                'code' => 1,
+                'msg' => 'userid必须填写'
+            ]);
+        }
+        $user = UserModel::where('id', $userid)->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => "用户不存在"
+            ]);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => $user
+        ]);
+    }
+
+    public function updateProductTips()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $data = request()->post();
+        $level = 0;
+        $content = "";
+        if (empty($data['product_id'])) {
+            return json([
+                'code' => 1,
+                'msg' => 'product_id必须填写',
+            ]);
+        }
+        if (empty($data['level'])) {
+            return json([
+                'code' => 1,
+                'msg' => 'level必须填写',
+            ]);
+        } else {
+            $level = intval($data['level']);
+        }
+        if ($level <= 0 || $level > 3) {
+            return json([
+                'code' => 1,
+                'msg' => 'level非法',
+            ]);
+        }
+        if (empty($data['content'])) {
+            return json([
+                'code' => 1,
+                'msg' => 'content必须填写',
+            ]);
+        } else {
+            $content = trim($data['content']);
+        }
+        $p = ProductTipsModel::where("product_id", $data['product_id'])->find();
+        if (empty($p)) {
+            ProductTipsModel::insert(['product_id' => $data['product_id'], 'level' => $level, 'content' => $content, 'update_time' => date('Y-m-d H:i:s')]);
+        } else {
+            ProductTipsModel::where("product_id", $data['product_id'])->update(['level' => $level, 'content' => $content, 'update_time' => date('Y-m-d H:i:s')]);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '设置成功',
+        ]);
+    }
+    public function getProductTipsData()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $page = input("get.page") ? input("get.page") : 1;
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $page = intval($page);
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = ProductTipsModel::count();
+        $products = ProductTipsModel::limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $products;
+        return json($list);
+    }
+    public function delProductTips()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $data = request()->post();
+        if (empty($data['product_id'])) {
+            return json([
+                'code' => 1,
+                'msg' => 'product_id必须填写',
+            ]);
+        }
+        ProductTipsModel::where("product_id", $data['product_id'])->delete();
+        return json([
+            'code' => 0,
+            'msg' => '删除成功',
+        ]);
+    }
+    public function getCardData()
+    {
+
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $page = input("get.page") ? input("get.page") : 1;
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $cardid = input("get.cardid") ? input("get.cardid") : '';
+        $orderid = input("get.orderid") ? input("get.orderid") : '';
+        $userid = input("get.userid") ? input("get.userid") : '';
+        $where = [];
+        if (!empty($cardid)) {
+            $where[] = ['id', 'LIKE', '%' . $cardid . '%'];
+        }
+        if (!empty($orderid)) {
+            $where[] = ['order_id', 'LIKE', '%' . $orderid . '%'];
+        }
+        if (!empty($userid)) {
+            $where[] = ['userid', '=', $userid];
+        }
+        $page = intval($page);
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = CardModel::where($where)->count();
+        $prdate = CardModel::where($where)->order('create_time', 'desc')->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $prdate;
+        return json($list);
+    }
+    public function getUserNoticeData()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $page = input("get.page") ? input("get.page") : 1;
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $userid = input("get.userid") ? input("get.userid") : '';
+        $status = input("get.status") ? input("get.status") : '';
+        $position = input("get.position") ? input("get.position") : '';
+        $where = [];
+        if (!empty($userid)) {
+            $where[] = ['userid', '=', $userid];
+        }
+        if (!empty($status)) {
+            $where[] = ['status', '=', $status];
+        }
+        if (!empty($position)) {
+            $where[] = ['position', '=', $position];
+        }
+        $page = intval($page);
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = UserNoticeModel::where($where)->count();
+        $notices = UserNoticeModel::where($where)->order('update_time', 'desc')->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $notices;
+        return json($list);
+    }
+
+    public function auditUserNotice()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $data = request()->post();
+        if (empty($data['userid'])) {
+            return json([
+                'code' => 1,
+                'msg' => "userid必须填写"
+            ]);
+        }
+        if (empty($data['position'])) {
+            return json([
+                'code' => 1,
+                'msg' => "position必须填写"
+            ]);
+        }
+        if (empty($data['status'])) {
+            return json([
+                'code' => 1,
+                'msg' => "status必须填写"
+            ]);
+        }
+        UserNoticeModel::where(['userid' => $data['userid'], 'position' => $data['position']])->update(['status' => $data['status']]);
+        return json([
+            'code' => 0,
+            'msg' => ''
+        ]);
+    }
+
+    public function deleteUser()
+    {
+        $data = request()->post();
+        $userid = 0;
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        if (empty($data['userid'])) {
+            return json([
+                'code' => 1,
+                'msg' => "userid必须填写"
+            ]);
+        } else {
+            $userid = intval($data['userid']);
+        }
+        $user = UserModel::where("id", $userid)->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => "用户不存在"
+            ]);
+        }
+        if ($user->balance != 0) {
+            return json([
+                'code' => 1,
+                'msg' => "该用户还有余额,不能注销"
+            ]);
+        }
+        if ($user->points != 0) {
+            return json([
+                'code' => 1,
+                'msg' => "该用户还有积分,不能注销"
+            ]);
+        }
+        //开始注销
+        AttachModel::where("userid", $userid)->delete();
+        BalanceModel::where("user_id", $userid)->delete();
+        CardModel::where("userid", $userid)->delete();
+        CheckOrderModel::where("userid", $userid)->update(["userid" => 0]);
+        EmailModel::where("user_id", $userid)->delete();
+        PayRecordModel::where("userid", $userid)->update(['userid' => 0]);
+        PointsModel::where("user_id", $userid)->delete();
+        SmsModel::where("user_id", $userid)->delete();
+        UserCheckModel::where("userid", $userid)->delete();
+        UserNoticeModel::where("userid", $userid)->delete();
+        UserWebModel::where("userid", $userid)->delete();
+        WithdrawModel::where("userid", $userid)->delete();
+        UserModel::where("id", $userid)->update(["name" => "", "email" => "#####", "mobile" => "#####", "status" => 3, "status_time" => date('Y-m-d H:i:s')]);
+        return json([
+            'code' => 0,
+            'msg' => "注销成功"
         ]);
     }
 }

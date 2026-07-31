@@ -2,7 +2,9 @@
 
 return [
     // 后台域名
-    'api_domain' => 'https://api.68paper.com',
-    // 前台根域名
-    'frontend_domain' => '68paper.com',
+    'api_domain' => 'https://api.68ppaer.com',
+    // 管理根域名
+    'admin_domain'=>'https://admin.68paper.com',
+    //这里必须为false
+    'is_test' => false,
 ];

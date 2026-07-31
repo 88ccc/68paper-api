@@ -4,7 +4,6 @@ namespace app\service;
 
 use app\model\CheckModel;
 use app\model\CheckOrderModel;
-use app\model\ShopProductModel;
 use app\model\UserCheckModel;
 use think\facade\Log;
 use think\facade\Queue;
@@ -12,7 +11,7 @@ use app\tool\QueueJob;
 
 class CheckService
 {
-    public function updateStatusFromSupplier($data)
+    public function updateStatusFromSupplier(array $data): bool
     {
         $order = CheckOrderModel::where('id', $data['id'])->find();
         if (empty($order)) {
@@ -53,17 +52,20 @@ class CheckService
             //计算平台价格
             $p_price = $check->price;
             $p_piece = 1;
-            if ($product->unit != 0) {
+            if ($check->unit != 0) {
                 //计算件数
-                $tmp = $data['word_count'] + $product->unit - 1;
-                $sell_piece = bcdiv($tmp, $product->unit, 0);
+                $tmp = $data['word_count'] + $check->unit - 1;
+                $sell_piece = bcdiv($tmp, $check->unit, 0);
                 $sell_price = $sell_piece * $product->price;
                 $tmp = $data['word_count'] + $check->unit - 1;
                 $p_piece = bcdiv($tmp, $check->unit, 0);
                 $p_price = $p_piece * $check->price;
             }
+            //计算推荐奖励
+            $reward = $check->reward * $p_piece;
+
             //平台是否亏本
-            if ($p_price < $data['total_price']) {
+            if (($p_price - $reward) < $data['total_price']) {
                 Log::error("供货价低于成本价 id=" . $data['id']);
                 $order->status = 3;
                 $order->remark = "供货价异常";
@@ -71,7 +73,7 @@ class CheckService
                 $order->save();
                 return true;
             }
-            //是否亏本
+            //用户是否亏本
             if ($sell_price < $p_price) {
                 Log::error("产品售价低于供货价 id=" . $data['id']);
                 $order->status = 3;
@@ -93,7 +95,7 @@ class CheckService
             $order->ppiece = $p_piece;
             $order->profit = $profit;
             $order->pprofit = $pprofit;
-            $order->tprofit = 0;
+            $order->tprofit = $reward;
             $order->update_time = date('Y-m-d H:i:s');
             $order->save();
             return true;
@@ -116,7 +118,6 @@ class CheckService
                 'id' => $data['id'],
                 'url' => $data['report']
             ];
-            Log::write("down start");
             Queue::push(QueueJob::class,  $data,  'default');
             return true;
         } else if ($data["status"] == 6) {
@@ -124,11 +125,12 @@ class CheckService
             CheckOrderModel::where('id', $data['id'])->update(['status' => 7, "update_time" => date("Y-m-d H:i:s")]);
             return true;
         }
+        return false;
     }
 
 
     //校验参数
-    public function validateParameters(array $data)
+    public function validateParameters(array $data): array
     {
         $updata = [];
 
@@ -183,7 +185,6 @@ class CheckService
         if ($order->product_id == "cqvipzpyjs") {
             if (!empty($data['school_id'])) {
                 $updata['school_id'] = trim($data['school_id']);
-                
             } else {
                 return [
                     'code' => 10001,
@@ -254,6 +255,4 @@ class CheckService
             'data' => $updata,
         ];
     }
-
-    
 }

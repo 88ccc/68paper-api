@@ -7,8 +7,8 @@ use Qcloud\Cos\Client;
 use think\facade\Log;
 class QcloudCosTool
 {
-    private $cosClient = null;
-    private $bucket = null;
+    private Client|null $cosClient = null;
+    private ?string $bucket = null;
     public function __construct()
     {
         $storageconfig = ConfigService::get("storage");
@@ -32,7 +32,7 @@ class QcloudCosTool
     }
 
     //传见上传链接
-    public function getPutObjectUrl($filekey)
+    public function getPutObjectUrl(string $filekey):string|null
     {
         if ($this->cosClient == null) {
             return null;
@@ -54,7 +54,7 @@ class QcloudCosTool
         }
     }
 
-    public function up_file($file, $file_key, $file_name = '')
+    public function up_file(string $file, string $file_key, string $file_name = ''):int
     { //文件名不得包含后缀
         $file_t = pathinfo($file, PATHINFO_EXTENSION);
         $file_namez = pathinfo($file, PATHINFO_BASENAME);
@@ -84,7 +84,7 @@ class QcloudCosTool
         return 0;
     }
 
-    public function get_down_url($file_key)
+    public function get_down_url(string $file_key):string
     {
         $signedUrl = '';
         try {
@@ -102,7 +102,7 @@ class QcloudCosTool
         return $signedUrl;
     }
 
-    public function delete_dir($dir)
+    public function delete_dir(string $dir)
     {
         $cos_prefix = $dir; // 例如 "cos/folder"; 不得以/开头
         $nextMarker = '';

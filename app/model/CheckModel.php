@@ -23,6 +23,7 @@ class CheckModel extends Model
         'name' => 'string', //产品名称
         'cost' => 'int', //成本价格单位分
         'price' => 'int', //供货价格单位分
+        'reward' => 'int', //邀请奖励金额单位分
         'unit'  => 'int', //计费单位,0按次计费,其他按字数计费
         'mini_price'  => 'int', //限制最低售价单位分
         'low_price'  => 'int', //88xuezi供货商规定的低售价单位分
@@ -33,4 +34,23 @@ class CheckModel extends Model
         'create_time'  => 'datetime',         //创建时间
         'update_time'  => 'datetime',         //更新时间
     ];
+
+    public function isAvailable(int $userid): bool
+    {
+        if ($this->status != 1) {
+            return false;
+        }
+        if ($this->supplier_status != 1) {
+            return false;
+        }
+
+        $usercheck = UserCheckModel::where(['userid' => $userid, 'product_id' => $this->id])->find();
+        if (empty($usercheck)) {
+            return false;
+        }
+        if ($usercheck->status != 1) {
+            return false;
+        }
+        return true;
+    }
 }

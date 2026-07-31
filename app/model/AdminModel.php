@@ -4,7 +4,7 @@ namespace app\model;
 
 use think\Model;
 use Firebase\JWT\JWT;
-use think\facade\Log;
+use think\facade\Config;
 
 class AdminModel extends Model
 {
@@ -55,15 +55,15 @@ class AdminModel extends Model
     /**
      * 获取用户头像
      */
-    public  function getAvatar($domian = "")
+    public  function getAvatarAttr(string|null $value):string
     {
-        if (empty($this->avatar)) {
-            return  $domian . '/static/images/avatar/default.png';
+        if (empty($value)) {
+            return  Config::get('website.api_domain') . '/images/avatar/default.png';
         }
-        if (strpos($this->avatar, 'http') === 0) {
-            return $this->avatar;
+        if (strpos($value, 'http') === 0) {
+            return $value;
         } else {
-            return  $domian . $this->avatar;
+            return  Config::get('website.api_domain') . $value;
         }
     }
 }

@@ -24,7 +24,7 @@ class PayModeModel extends Model
         'mchpublicpath' => 'string', //微信商户公钥路径
         'appsecret' => 'string', //支付宝应用私钥
         'apppublicpath' => 'string', //支付宝应用公钥证书路径
-        'alipublicpath' => 'string', //支付宝公钥证书路径
+        'alipublicpath' => 'string', //支付宝公钥证书路径/微信支付公钥证书
         'alirootpath' => 'string', //支付宝根证书路径
         'create_time'  => 'datetime',         //创建时间
         'update_time'  => 'datetime',         //更新时间

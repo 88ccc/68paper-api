@@ -9,8 +9,8 @@ use AlibabaCloud\Oss\V2 as Oss;
 class AliOSSTool
 {
 
-    private $ossClient = null;
-    private $bucket = "";
+    private Oss\Client|null $ossClient = null;
+    private string $bucket = "";
 
     public function __construct()
     {
@@ -28,7 +28,7 @@ class AliOSSTool
         }
     }
 
-    public function up_file($file, $file_key, $file_name = '')
+    public function up_file(string $file, string $file_key, string $file_name = ''):int
     { //文件名不得包含后缀
         $file_t = pathinfo($file, PATHINFO_EXTENSION);
         $file_namez = pathinfo($file, PATHINFO_BASENAME);
@@ -56,7 +56,7 @@ class AliOSSTool
         return 0;
     }
 
-    public function get_down_url($file_key)
+    public function get_down_url(string $file_key):string
     {
         $signedUrl = '';
         try {
@@ -74,7 +74,7 @@ class AliOSSTool
         }
         return $signedUrl;
     }
-    public function delete_dir($dir)
+    public function delete_dir(string $dir)
     {
         $paginator = new Oss\Paginator\ListObjectsV2Paginator(client: $this->ossClient);
         $iter = $paginator->iterPage(new Oss\Models\ListObjectsV2Request(

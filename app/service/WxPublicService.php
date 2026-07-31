@@ -7,16 +7,21 @@ use think\facade\Log;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use think\facade\Config;
+use think\facade\Cache;
 
 class WxPublicService
 {
 
     public $appid = '';
     private $appSecret = '';
+    protected Client $httpClient;
 
     public  function __construct()
     {
         $this->updateConfig();
+        $this->httpClient = new Client([
+            'timeout' => 10.0
+        ]);
     }
 
     // 获取单例实例的方法
@@ -48,7 +53,9 @@ class WxPublicService
         return true;
     }
 
-    public function authorizeUrl($redirectUri, $state = "1")
+
+
+    public function authorizeUrl(string $redirectUri, $state = "1"): string
     {
         $wechat_url = Config::get('website.wx_auth_domain');
         $redirect = $redirectUri;
@@ -61,11 +68,42 @@ class WxPublicService
     }
 
 
+    public function getAccessToken(): string
+    {
+        $cacheKey = 'wechat_official_stable_token_' . $this->appid;
+        $token = Cache::get($cacheKey);
+        if ($token) {
+            return $token;
+        }
+
+        $apiUrl = "https://api.weixin.qq.com/cgi-bin/stable_token";
+        $postJson = [
+            "grant_type"    => "client_credential",
+            "appid"         => $this->appid,
+            "secret"        => $this->appSecret,
+            "force_refresh" => false // 不强制刷新，核心稳定特性
+        ];
+
+        $res = $this->httpClient->post($apiUrl, [
+            'json' => $postJson,
+            'timeout' => 10
+        ]);
+        $data = json_decode($res->getBody()->getContents(), true);
+
+        if (!empty($data['errcode'])) {
+            Log::error("获取StableAccessToken失败：{$data['errcode']} {$data['errmsg']}");
+            return "";
+        }
+        // 缓存7000秒，预留200秒缓冲
+        $expires = $data['expires_in'] - 200;
+        Cache::set($cacheKey, $data['access_token'], $expires);
+        return $data['access_token'];
+    }
+
+
 
     public function getAccessOpenID(string $code): array
     {
-        // 初始化Guzzle客户端
-        $client = new Client();
 
         // 拼接请求参数（全部已知固定）
         $params = [
@@ -78,7 +116,7 @@ class WxPublicService
 
         try {
             // 发送GET请求
-            $response = $client->get($url, [
+            $response = $this->httpClient->get($url, [
                 'query' => $params
             ]);
 
@@ -105,5 +143,40 @@ class WxPublicService
                 'msg'     => '请求失败：' . $e->getMessage()
             ];
         }
+    }
+
+    /**
+     * 发送模板消息
+     * @param string $openid 用户openid
+     * @param string $templateId 模板ID
+     * @param array $data 模板字段数据
+     * @param string $url 跳转链接（可选）
+     * @param array $miniProgram 小程序跳转（可选）
+     * @return array
+     */
+    public function sendTemplateMsg(string $openid, string $templateId, array $data, string $url = '', array $miniProgram = []): array
+    {
+        $accessToken = $this->getAccessToken();
+        $apiUrl = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={$accessToken}";
+
+        $postData = [
+            'touser'      => $openid,
+            'template_id' => $templateId,
+            'data'        => $data
+        ];
+        // 跳转链接
+        if (!empty($url)) {
+            $postData['url'] = $url;
+        }
+        // 关联小程序
+        if (!empty($miniProgram)) {
+            $postData['miniprogram'] = $miniProgram;
+        }
+
+        $response = $this->httpClient->post($apiUrl, [
+            'json' => $postData
+        ]);
+        $result = json_decode($response->getBody()->getContents(), true);
+        return $result;
     }
 }

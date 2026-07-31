@@ -14,7 +14,7 @@ use RecursiveDirectoryIterator;
 
 class StorageService
 {
-    public static function save($file, $file_name)
+    public static function save(string $file, string $file_name): array|null
     {
         //file_name 不含扩展名
         $storageconfig = ConfigService::get("storage");
@@ -43,8 +43,12 @@ class StorageService
                 copy($file, $save_file);
             }
             //下载地址
-            $down_url = Config::get('website.api_domain') .  '/report/' . date('Ymd/') . urlencode($file_name) . '.' . $file_t;
-            return $down_url;
+            $file_key = '/report/' . date('Ymd/') . urlencode($file_name) . '.' . $file_t;
+            $down_url = Config::get('website.api_domain') . $file_key;
+            return [
+                'key' => $file_key,
+                'url' => $down_url,
+            ];
         }
         if ($type == 2) {
             $basename = pathinfo($file, PATHINFO_BASENAME);
@@ -53,9 +57,11 @@ class StorageService
             $ret = $cos->up_file($file, $file_key, $file_name);
             if ($ret === 0) {
                 $down_url = $cos->get_down_url($file_key);
-                return $down_url;
+                return [
+                    'key' => $file_key,
+                    'url' => $down_url,
+                ];
             }
-            return null;
         }
         if ($type == 3) {
             $basename = pathinfo($file, PATHINFO_BASENAME);
@@ -64,14 +70,55 @@ class StorageService
             $ret = $oss->up_file($file, $file_key, $file_name);
             if ($ret === 0) {
                 $down_url = $oss->get_down_url($file_key);
-                return $down_url;
+                return [
+                    'key' => $file_key,
+                    'url' => $down_url,
+                ];
             }
-            return null;
         }
+        return null;
+    }
+
+    public function getFileUrl(string $file_key): string|null
+    {
+        $down_url = "";
+        $storageconfig = ConfigService::get("storage");
+        $type = 1; //1=本地，2=腾讯云，3=阿里云
+        if (empty($storageconfig)) {
+            $type = 1;
+        } else {
+            if ($storageconfig['storageType'] == "tencent") {
+                $type = 2;
+            } else if ($storageconfig['storageType'] == "ali") {
+                $type = 3;
+            }
+        }
+        if ($type == 1) {
+            $down_url = Config::get('website.api_domain') . $file_key;
+        }
+        if ($type == 2) {
+            $cos = new QcloudCosTool();
+            $down_url = $cos->get_down_url($file_key);
+        }
+        if ($type == 3) {
+            $oss = new AliOSSTool();
+            $down_url = $oss->get_down_url($file_key);
+        }
+        return $down_url;
     }
 
     public function clean_report()
     {
+        $report = 7;
+        $config = ConfigService::get("cache_set");
+        if (!empty($config)) {
+            if (isset($config['report'])) {
+                $temp = intval($config['report']);
+                if ($temp > $report) {
+                    $report = $temp;
+                }
+            }
+        }
         $time = date("Ymd", strtotime("-7 day"));
         $time1 = date("Ymd", strtotime("-8 day"));
         $storageconfig = ConfigService::get("storage");
@@ -94,6 +141,8 @@ class StorageService
         } catch (Exception $e) {
             // 捕获异常并输出错误信息
         }
+        $time = date("Ymd", strtotime("-" . $report . " day"));
+        $time1 = date("Ymd", strtotime("-" . ($report + 1) . " day"));
         if ($type == 1) {
             $path = public_path() .  '/report/' . $time;
             $path1 = public_path() .  '/report/' . $time1;

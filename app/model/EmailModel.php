@@ -4,6 +4,8 @@ namespace app\model;
 
 use app\tool\EmailTool;
 use think\Model;
+use think\facade\Config;
+use think\facade\Log;
 
 
 class EmailModel extends Model
@@ -16,7 +18,7 @@ class EmailModel extends Model
     protected $schema = [
         'id'           => 'string',          //键值
         'user_id'      => 'int',             //用户id
-        'type_code'    => 'int',             //业务类型 1发送验证码 2 余额告警
+        'type_code'    => 'int',             //业务类型 1发送验证码 2 余额告警 3 提现通知
         'email'        => 'string', //接收方
         'code'    => 'string',                //验证码
         'subject'      => 'string',          //邮件主题
@@ -31,7 +33,7 @@ class EmailModel extends Model
 
 
     //验证验证码
-    public function verifyCode($email, $code)
+    public function verifyCode(string $email, string $code):array
     {
         //当前推后五分钟
         $expire_time = date('Y-m-d H:i:s', strtotime("-10 minutes"));
@@ -51,7 +53,7 @@ class EmailModel extends Model
     /**
      * 发送验证码
      */
-    public function sendCode($email, $userid, $isReg = true)
+    public function sendCode(string $email,int $userid, bool $isReg = true):array
     {
         $expire_time = date('Y-m-d H:i:s', strtotime("-1 minutes"));
         $result = $this->where(['email'=>$email,'type_code'=>1])->whereTime('create_time', '>', $expire_time)->find();
@@ -101,15 +103,16 @@ class EmailModel extends Model
      * 发送余额告警
      * balance 单位元
      */
-    public function sendBalanceAlarm(string $email, int $userid, string $balance)
+    public function sendBalanceAlarm(string $email, int $userid, string $balance):array
     {
         $expire_time = date('Y-m-d H:i:s', strtotime("-2 hours"));
+        $adminUrl = Config::get('website.admin_domain');
         $result = $this->where(['email'=>$email,'type_code'=>2])->whereTime('create_time', '>', $expire_time)->find();
         if ($result) {
             return ['code' => 1, 'msg' => '发邮件太频繁了'];
         }
         $emailtool = new EmailTool();
-        $content = "您的余额仅剩 " . $balance . " 元，请及时充值，以免影响使用。如果你不想再收到此类消息，可以登录88学子开放平台，取消余额预警功能。";
+        $content = "您的积分仅剩 " . $balance . " 元，请及时充值，以免影响使用。如果你不想再收到此类消息，可以登录后台，取消消息订阅。<br/>后台地址：<a href='".$adminUrl."'>".$adminUrl."</a>";
         
         $mid = uniqid("EMAIL", true);
         $subject = "余额告警";
@@ -136,4 +139,48 @@ class EmailModel extends Model
             return ['code' => 1, 'msg' => '发送失败'];
         }
     }
+
+
+    public function sendWithdrawNotice(string $email, int $userid, bool $succ):array
+    {
+        $expire_time = date('Y-m-d H:i:s', strtotime("-2 hours"));
+        $adminUrl = Config::get('website.admin_domain');
+        $result = $this->where(['email'=>$email,'type_code'=>3])->whereTime('create_time', '>', $expire_time)->find();
+        if ($result) {
+            return ['code' => 1, 'msg' => '发邮件太频繁了'];
+        }
+        $emailtool = new EmailTool();
+        $result = "您的提现申请处理失败，";
+        if($succ){
+            $result = "您的提现申请处理成功，";
+        }
+        $content = $result."请及时登录后台查看。如果你不想再收到此类消息，可以登录后台，取消消息订阅。<br/>后台地址：<a href='".$adminUrl."'>".$adminUrl."</a>";
+        
+        $mid = uniqid("EMAIL", true);
+        $subject = "余额告警";
+        $model = new EmailModel();
+        $model->id = $mid;
+        $model->user_id = $userid;
+        $model->type_code = 2;
+        $model->email = $email;
+        $model->code = "";
+        $model->subject = $subject;
+        $model->body = $content;
+        $model->status = 0;
+        $model->create_time = date('Y-m-d H:i:s');
+        $model->update_time = date('Y-m-d H:i:s');
+        $model->save();
+        $result = $emailtool->send($email, '', $subject, $content, null, '');
+        if ($result['success']) {
+            
+            EmailModel::update(['status' => 1, 'id' =>  $mid, 'update_time' => date('Y-m-d H:i:s')]);
+            return ['code' => 0, 'msg' => '发送成功'];
+        } else {
+            $model->status = 2;
+            EmailModel::update(['status' => 2, 'id' =>  $mid, 'update_time' => date('Y-m-d H:i:s')]);
+            return ['code' => 1, 'msg' => '发送失败'];
+        }
+    }
+
+    
 }

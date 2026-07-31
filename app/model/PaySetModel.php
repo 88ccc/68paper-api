@@ -23,7 +23,7 @@ class PaySetModel extends Model
 
     ];
 
-    static function  deleteModelId($modeid){
+    static function  deleteModelId(int $modeid){
         PaySetModel::where('modeid',$modeid)->update(['modeid'=>0,'status'=>0,'prefer'=>0,'update_time'=>date('Y-m-d H:i:s')]);
     }
 }

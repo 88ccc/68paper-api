@@ -708,7 +708,7 @@ class Console extends BaseController
             ], [
                 ['userid', '=', $userid]
             ]]);
-        })->where($where)->withoutField('original,pcost,ppiece,pprofit,lock,file_key,report_url,payid,lock_time')->order('create_time', 'desc')->limit($start, $limit)->select();
+        })->where($where)->withoutField('original,pcost,pprofit,lock,file_key,report_url,payid,lock_time')->order('create_time', 'desc')->limit($start, $limit)->select();
         $list["count"] = $count;
         $list["data"] = $products;
         return json($list);

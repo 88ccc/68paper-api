@@ -701,13 +701,23 @@ class PayService
             if (!empty($user->tid)) {
                 $tuser = UserModel::where("id", $user->tid)->find();
                 if (!empty($tuser)) {
-                    $tuser->increaseBalance($checkOrder->tprofit, 1, $checkOrder->id,'邀请奖励(销售:' . $checkOrder->userid . ')');
+                    $tuser->increaseBalance($checkOrder->tprofit, 1, $checkOrder->id, '邀请奖励(销售:' . $checkOrder->userid . ')');
                     UserModel::where("id", $checkOrder->tid)->inc('money', $checkOrder->tprofit)->update();
                     UserModel::where("id", $checkOrder->userid)->inc('tmoney', $checkOrder->tprofit)->update();
                 }
             }
             //支付订单
-            $ret =  (new Check())->payOrder($checkOrder->id, $checkOrder->title, $checkOrder->author, $checkOrder->end_date, $checkOrder->school_id, $checkOrder->class_code, $checkOrder->class_type);
+            $check_data = [
+                "title" => $checkOrder->title,
+                "author" => $checkOrder->author
+            ];
+            if (!empty($checkOrder->end_date)) {
+                $check_data['end_date'] = $checkOrder->end_date;
+            }
+            if (!empty($checkOrder->param)) {
+                $check_data = array_merge($check_data, $checkOrder->param);
+            }
+            $ret =  (new Check())->payOrder($checkOrder->id, $check_data);
             if ($ret['code'] == 0) {
                 CheckOrderModel::where("id", $payorder->orderid)->update(['status' => 5, 'update_time' => date('Y-m-d H:i:s')]);
                 return [

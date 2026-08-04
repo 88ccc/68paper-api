@@ -12,6 +12,8 @@ class CheckOrderModel extends Model
     protected $table = 'pt_check_order';
     // 模型数据表主键
     protected $pk = 'id';
+        // 设置json类型字段
+    protected $json = ['param'];
     protected array $schema = [
         'id'          => 'string',
         'userid' => 'int', //用户ID
@@ -24,6 +26,7 @@ class CheckOrderModel extends Model
         'school_id'=>'string',//维普智评学校id
         'class_code'=>'string',//维普智评学科
         'class_type'=>'string',//维普智评类型
+        'param'=>"json",//参数
         'cost' => 'int', //代理成本 单位分
         'pcost' => 'int', //平台成本 单位分
         'unit_price' => 'int', //单价 单位分

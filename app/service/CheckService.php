@@ -133,6 +133,7 @@ class CheckService
     public function validateParameters(array $data): array
     {
         $updata = [];
+        $param = [];
 
         if (empty($data['order_id'])) {
             return [
@@ -178,13 +179,13 @@ class CheckService
         if ($order->product_id == "cqvipzpdxs") {
             //维普智评大学生版
             if (!empty($data['school_id'])) {
-                $updata['school_id'] = trim($data['school_id']);
+                $param["school_id"] = trim($data['school_id']);
             }
         }
 
         if ($order->product_id == "cqvipzpyjs") {
             if (!empty($data['school_id'])) {
-                $updata['school_id'] = trim($data['school_id']);
+                $param["school_id"] = trim($data['school_id']);
             } else {
                 return [
                     'code' => 10001,
@@ -193,7 +194,7 @@ class CheckService
             }
 
             if (!empty($data['class_code'])) {
-                $updata['class_code'] = trim($data['class_code']);
+                $param["class_code"] = trim($data['class_code']);
             } else {
                 return [
                     'code' => 10001,
@@ -203,12 +204,18 @@ class CheckService
         }
         if ($order->product_id == "cqvipzpqk") {
             if (!empty($data['class_type'])) {
-                $updata['class_type'] = trim($data['class_type']);
+                $param["class_type"] = trim($data['class_type']);
             } else {
                 return [
                     'code' => 10001,
                     'msg' => '必须填写类型'
                 ];
+            }
+        }
+
+        if ($order->product_id == "zjcaigc") {
+            if (!empty($data['ai_plat'])) {
+                $param["ai_plat"] = trim($data['ai_plat']);
             }
         }
 
@@ -248,6 +255,9 @@ class CheckService
             }
         }
         $updata['update_time'] = date('Y-m-d H:i:s', time());
+        if(!empty($param)){
+            $updata['param'] = $param;
+        }
         return [
             'code' => 0,
             'msg' => '',

@@ -1247,7 +1247,17 @@ class Index extends BaseController
             ['status', 'in', [4, 6]]
         ])->whereTime('update_time', '<', $time)->order('create_time', 'asc')->limit(0, 10)->select();
         foreach ($orders as $order) {
-            $ret =  (new Check())->payOrder($order->id, $order->title, $order->author, $order->end_date, $order->school_id, $order->class_code, $order->class_type);
+            $check_data = [
+                "title" => $order->title,
+                "author" => $order->author
+            ];
+            if (!empty($order->end_date)) {
+                $check_data['end_date'] = $order->end_date;
+            }
+            if (!empty($order->param)) {
+                $check_data = array_merge($check_data, $order->param);
+            }
+            $ret =  (new Check())->payOrder($order->id, $check_data);
             if ($ret['code'] == 0) {
                 CheckOrderModel::where("id", $order->id)->update(['status' => 5, 'update_time' => date('Y-m-d H:i:s')]);
             } else {

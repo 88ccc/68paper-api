@@ -516,7 +516,17 @@ class Check extends BaseController
                 UserModel::where("id", $order->userid)->inc('tmoney', $order->tprofit)->update();
             }
         }
-        $ret =  (new SupplierCheck())->payOrder($order->id, $order->title, $order->author, $order->end_date, $order->school_id, $order->class_code, $order->class_type);
+        $check_data = [
+            "title" => $order->title,
+            "author" => $order->author
+        ];
+        if (!empty($order->end_date)) {
+            $check_data['end_date'] = $order->end_date;
+        }
+        if (!empty($order->param)) {
+            $check_data = array_merge($check_data, $order->param);
+        }
+        $ret =  (new SupplierCheck())->payOrder($order->id, $check_data);
         if ($ret['code'] == 0) {
             CheckOrderModel::where("id", $orderid)->update(['status' => 5, 'update_time' => date('Y-m-d H:i:s')]);
             return [

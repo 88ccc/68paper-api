@@ -98,7 +98,7 @@ class Check
         return $result;
     }
 
-    public function payOrder(string $orderid, string $title, string $author, ?string $end_date, ?string $school_id, ?string $class_code, ?string $class_type){
+    public function payOrder(string $orderid, array $data){
         $config = ConfigService::get("checkkey");
         if (empty($config)) {
             return [
@@ -123,20 +123,23 @@ class Check
             'user_id' => $config['userid'],
             'timestamp' => time(),
             'order_id'=>$orderid,
-            'title'=>$title,
-            'author'=>$author,
+            'title'=>$data['title'],
+            'author'=>$data['author'],
         ];
-        if(!empty($end_date)){
-            $params['end_date'] = $end_date;
+        if(!empty($data['end_date'])){
+            $params['end_date'] = $data['end_date'];
         }
-        if(!empty($school_id)){
-            $params['school_id'] = $school_id;
+        if(!empty($data['school_id'])){
+            $params['school_id'] = $data['school_id'];
         }
-        if(!empty($class_code)){
-            $params['class_code'] = $class_code;
+        if(!empty($data['class_code'])){
+            $params['class_code'] = $data['class_code'];
         }
-        if(!empty($class_type)){
-            $params['class_type'] = $class_type;
+        if(!empty($data['class_type'])){
+            $params['class_type'] = $data['class_type'];
+        }
+        if(!empty($data["ai_plat"])){
+            $params['ai_plat'] = $data['ai_plat'];
         }
         $sign = $this->generateSignature($params, $config['key']);
         $params['sign'] = $sign;

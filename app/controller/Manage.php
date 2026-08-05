@@ -1754,18 +1754,6 @@ class  Manage extends BaseController
             $befor_points = $user->points;
             $ret = $user->decreasePoints($p, $type, $businessNo,  $remark, 0, 2);
             if ($ret) {
-                if (!empty($user->alarm_threshold)) {
-                    if ($befor_points > $user->alarm_threshold) {
-                        if (($befor_points - $p) <= $user->alarm_threshold) {
-                            $data = [
-                                'job' => 'send_submsg',
-                                'userid' => $user->id,
-                                'event' => "points"
-                            ];
-                            Queue::push(QueueJob::class,  $data,  'default');
-                        }
-                    }
-                }
                 return json([
                     'code' => 0,
                     'msg' => '成功'

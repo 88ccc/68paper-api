@@ -226,7 +226,6 @@ class CardService
                 'msg' => '用户余额不足'
             ];
         }
-        $befor_points = $user->points;
         $dret = $user->decreasePoints($cost, 2, $orderid, "", 0, 1);
         if (!$dret) {
             return [
@@ -234,20 +233,6 @@ class CardService
                 'msg' => '扣款失败'
             ];
         }
-        if (!empty($user->alarm_threshold)) {
-            if ($befor_points > $user->alarm_threshold) {
-                if (($befor_points - $cost) <= $user->alarm_threshold) {
-                    $data = [
-                        'job' => 'send_submsg',
-                        'userid' => $user->id,
-                        'event' => "points"
-                    ];
-                    Queue::push(QueueJob::class,  $data,  'default');
-                }
-            }
-        }
-
-
         //开始核销
         $need = $piece;
         foreach ($cardarr as $cardid) {

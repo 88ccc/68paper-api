@@ -523,12 +523,14 @@ class UserModel extends Model
             }
             // 6. 提交事务
             $this->commit();
+            
             if ($this->alarm_threshold > 0 && (!empty($this->alarm_method))) {
                 if (($beforeBalance > $this->alarm_threshold) && ($afterBalance <= $this->alarm_threshold)) {
                     //余额告警
                     $data = [
-                        'job' => 'balance_alarm',
-                        'userid' => $this->id
+                        'job' => 'send_submsg',
+                        'userid' => $this->id,
+                        'event' => "points"
                     ];
                     Queue::push(QueueJob::class,  $data,  'default');
                 }

@@ -645,6 +645,13 @@ class Console extends BaseController
                 'msg' => '个性域名只支持小写字母和数字，长度为4~32位'
             ]);
         }
+        $isReserved = isReservedDomain($domain);
+        if ($isReserved) {
+            return json([
+                'code' => 1,
+                'msg' => '个性域名已被占用，请更换'
+            ]);
+        }
         $userweb = UserWebModel::where('userid', $userid)->find();
         if (!empty($userweb)) {
             return json([
@@ -1607,6 +1614,96 @@ class Console extends BaseController
         return json([
             'code' => 0,
             'msg' => '设置成功'
+        ]);
+    }
+
+    public function getApiInfo()
+    {
+        $userid = $this->request->userid;
+        $user = UserModel::where("id", $userid)->find();
+        $notify_url = Config::get('unotify.notify_' . $userid);
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => [
+                'status' => $user->api_status,
+                'notify_url' => $notify_url,
+            ]
+        ]);
+    }
+
+    public function getApiKey()
+    {
+        $extensionsEnable = false;
+        $funConfig = ConfigService::get("function");
+        if (!empty($funConfig)) {
+            $extensionsEnable = strtolower($funConfig['extensions']) == 'true';
+        }
+        if (!$extensionsEnable) {
+            return json([
+                'code' => 1,
+                'msg' => '没有启用扩展功能'
+            ]);
+        }
+        $userid = $this->request->userid;
+        $user = UserModel::where('id', $userid)->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => '用户不存在'
+            ]);
+        }
+        $type = $this->request->get('verifyType');
+        $code = $this->request->get('code');
+        if ($type == 'email') {
+            $emailMode = new EmailModel();
+            $ret = $emailMode->verifyCode($user->email, $code);
+            if ($ret['code'] != 0) {
+                return json([
+                    'code' => 1,
+                    'msg' => "验证码错误"
+                ]);
+            }
+        } else if ($type == 'phone') {
+            $mobileMode = new SmsModel();
+            $ret = $mobileMode->verifyCode($user->mobile, $code);
+            if ($ret['code'] != 0) {
+                return json([
+                    'code' => 1,
+                    'msg' => "验证码错误"
+                ]);
+            }
+        }
+        $apikey = $user->apikey;
+        if (empty($apikey)) {
+            $apikey = getNonceStr(32);
+            UserModel::where("id", $userid)->update(['apikey' => $apikey]);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '获取成功',
+            'data' => [
+                'apikey' => $apikey
+            ]
+        ]);
+    }
+
+    public function resetApiKey()
+    {
+        $userid = $this->request->userid;
+        $user = UserModel::where('id', $userid)->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => '用户不存在'
+            ]);
+        }
+        $apikey = getNonceStr(32);
+        UserModel::where("id", $userid)->update(['apikey' => $apikey]);
+
+        return json([
+            'code' => 0,
+            'msg' => '重置成功',
         ]);
     }
 }

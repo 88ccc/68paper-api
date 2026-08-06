@@ -2,6 +2,23 @@
 // 应用公共文件
 
 /**
+ * 判断个性域名是否是保留关键域名
+ */
+function isReservedDomain(string $domain): bool
+{
+    
+    $reserveArry = [
+        'mobile','wiki',"admin","adminp",
+        "admins","agent","zjchong","zaojiance",
+        "checkpass","cnki","wanfang","turnitin",
+        "turnitinuk","ithenticate","grammarly",
+        "cqvip","paperyy","paperpass","back"
+        ];
+    return in_array($domain, $reserveArry);
+}
+
+
+/**
  * 判断目标字符串是否存在于逗号分隔的列表字符串中
  *
  * @param string $listStr 逗号分隔的列表字符串（如"doc,docx,pdf,ppt"）

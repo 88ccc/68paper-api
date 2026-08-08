@@ -281,6 +281,12 @@ class Check extends BaseController
             }
         }
         if (empty($orderid)) {
+            $order = CheckOrderModel::where(['payid' => $payid])->find();
+            if (!empty($order)) {
+                $orderid = $order->id;
+            }
+        }
+        if (empty($orderid)) {
             return json([
                 'code' => 1,
                 'msg' => "没有找到支付记录，请检查订单号"

@@ -721,102 +721,6 @@ class Index extends BaseController
         return json($ret);
     }
 
-    public function reportInfo()
-    {
-        $data = $this->request->post();
-        $orderid = "";
-        $title = "";
-        $author = "";
-        $endTime = "";
-        if (empty($data['orderid'])) {
-            return json([
-                'code' => 1,
-                'msg' => '订单号不能为空'
-            ]);
-        } else {
-            $orderid = trim($data['orderid']);
-        }
-        $order = CheckOrderModel::where(['id' => $orderid])->find();
-        if (empty($order)) {
-            return json([
-                'code' => 1,
-                'msg' => '订单不存在'
-            ]);
-        }
-        if ($order->status > 3) {
-            return json([
-                'code' => 1,
-                'msg' => '订单已处理'
-            ]);
-        }
-        if (empty($data['title'])) {
-            return json([
-                'code' => 1,
-                'msg' => '标题不能为空'
-            ]);
-        } else {
-            $title = trim($data['title']);
-        }
-        if (empty($data['author'])) {
-            return json([
-                'code' => 1,
-                'msg' => '作者不能为空'
-            ]);
-        } else {
-            $author = trim($data['author']);
-        }
-        if ($order->product_id == "wanfangzc") {
-            if (empty($data['endTime'])) {
-                return json([
-                    'code' => 1,
-                    'msg' => '发表日期不能为空'
-                ]);
-            } else {
-                $endTime = trim($data['endTime']);
-            }
-        }
-        //检查长度
-        $check = CheckModel::where(['id' => $order->product_id])->find();
-        if (empty($check)) {
-            return json([
-                'code' => 1,
-                'msg' => '产品不存在'
-            ]);
-        }
-        if ($check->config['title_max'] < mb_strlen($title)) {
-            return json([
-                'code' => 1,
-                'msg' => '标题长度超出限制' . $check->config['title_max']
-            ]);
-        }
-        if ($check->config['author_max'] < mb_strlen($author)) {
-            return json([
-                'code' => 1,
-                'msg' => '作者长度超出限制' . $check->config['author_max']
-            ]);
-        }
-        //检测文章字数
-        if ($order->words > 0) {
-            if ($check->config['max_words'] < $order->words) {
-                return json([
-                    'code' => 1,
-                    'msg' => "文章字数(" . $order->words . ")超出限制(" . $check->config['max_words'] . ")"
-                ]);
-            }
-            if ($check->config['min_words'] > $order->words) {
-                return json([
-                    'code' => 1,
-                    'msg' => "文章字数(" . $order->words . ")低于限制(" . $check->config['min_words'] . ")"
-                ]);
-            }
-        }
-        CheckOrderModel::where(['id' => $orderid])->update(['title' => $title, 'author' => $author, 'end_date' => $endTime]);
-        return json([
-            'code' => 0,
-            'msg' => '',
-        ]);
-    }
-
     public function payquery()
     {
         $pid = $this->request->post('payid');
@@ -1134,6 +1038,42 @@ class Index extends BaseController
             fclose($file1);
             return;
         }
+    }
+
+    public function getJsapDomain()
+    {
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => [
+                'url' => Config::get('website.admin_domain')
+            ]
+        ]);
+    }
+
+    public function getOrderInfo()
+    {
+        $orderid = $this->request->post('orderid');
+        if (empty($orderid)) {
+            return json([
+                'code' => 1,
+                'msg' => '订单号不能为空'
+            ]);
+        } else {
+            $orderid = trim($orderid);
+        }
+        $order = CheckOrderModel::where(['id' => $orderid])->withoutField(['original', 'cost', 'pcost', 'ppiece', 'profit', 'pprofit', 'tprofit', 'lock', 'file_key', 'lock_time'])->find();
+        if (empty($order)) {
+            return json([
+                'code' => 1,
+                'msg' => '订单不存在'
+            ]);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => $order
+        ]);
     }
 
     public function getCheckIdAndName()

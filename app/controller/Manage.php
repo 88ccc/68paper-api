@@ -1242,7 +1242,7 @@ class  Manage extends BaseController
     {
         //今日订单数
         $sub_count = CheckOrderModel::whereDay('create_time')->count();
-        $data = CheckOrderModel::whereDay('create_time')->where([['status', 'IN', [4, 5, 6, 7, 8, 10]]])->field('count(id) as mun_count, SUM(total_price) as sales,SUM(profit) as myprofit')->select()
+        $data = CheckOrderModel::whereDay('create_time')->where([['status', 'IN', [4, 5, 6, 7, 8, 10]]])->field('count(id) as mun_count, SUM(total_price) as sales,SUM(pprofit) as myprofit')->select()
             ->toArray();
         $today = date('Y-m-d');
         $sevenDaysAgo = date('Y-m-d', strtotime('-6 days'));

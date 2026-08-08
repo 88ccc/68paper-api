@@ -466,10 +466,12 @@ class Console extends BaseController
             return json($list);
         }
         $file_path =  $attach->file_path;
-
-        if (file_exists($file_path)) {
-            unlink($file_path);
+        if (!empty($file_path)) {
+            if (file_exists($file_path)) {
+                unlink($file_path);
+            }
         }
+
         AttachModel::where('userid', $userid)->delete();
         return json([
             'code' => 0,
@@ -566,6 +568,12 @@ class Console extends BaseController
             return json([
                 'code' => 1,
                 'msg' => '售价不能低于供货价'
+            ]);
+        }
+        if ($price > ($costPrice * 10)) {
+            return json([
+                'code' => 1,
+                'msg' => '售价不能高于供货价10倍'
             ]);
         }
         if ($price < $minPrice) {

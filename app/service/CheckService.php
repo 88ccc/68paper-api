@@ -1,5 +1,4 @@
 <?php
-// 自定义工具类 ConfigService.php
 namespace app\service;
 
 use app\model\CheckModel;
@@ -176,6 +175,50 @@ class CheckService
                 $updata['end_date'] = trim($data['end_date']);
             }
         }
+
+        if (str_starts_with($order->product_id, 'cqvip')) {
+            if (preg_match('/[\x{4e00}-\x{9fa5}a-zA-Z]/u', $updata['title']) == 0) {
+                return [
+                    'code' => 10001,
+                    'msg' => '标题必须包含汉字或者字母'
+                ];
+            }
+            if (preg_match('/[\x{4e00}-\x{9fa5}a-zA-Z]/u', $updata['author']) == 0) {
+                return [
+                    'code' => 10001,
+                    'msg' => '作者必须包含汉字或者字母'
+                ];
+            }
+            // $pattern = '/[\\/:*?"<>|]/';
+            // if (preg_match($pattern, $updata['title']) == 1) {
+            //     return [
+            //         'code' => 10001,
+            //         'msg' => '标题不得包含\/:*?"<>|'
+            //     ];
+            // }
+            // if (preg_match($pattern, $updata['author']) == 1) {
+            //     return [
+            //         'code' => 10001,
+            //         'msg' => '作者不得包含\/:*?"<>|'
+            //     ];
+            // }
+        }
+        if (str_starts_with($order->product_id, 'turnitin')) {
+            if (preg_match('/[\x{4e00}-\x{9fff}]/u', $updata['author']) === 1) {
+                return [
+                    'code' => 10001,
+                    'msg' => '作者不得包含中文'
+                ];
+            }
+            if (preg_match('/[\x{4e00}-\x{9fff}]/u', $updata['title']) === 1) {
+                return [
+                    'code' => 10001,
+                    'msg' => '标题不得包含中文'
+                ];
+            }
+        }
+
+
         if ($order->product_id == "cqvipzpdxs") {
             //维普智评大学生版
             if (!empty($data['school_id'])) {
@@ -255,7 +298,7 @@ class CheckService
             }
         }
         $updata['update_time'] = date('Y-m-d H:i:s', time());
-        if(!empty($param)){
+        if (!empty($param)) {
             $updata['param'] = $param;
         }
         return [

@@ -2552,4 +2552,21 @@ class  Manage extends BaseController
             'msg' => "注销成功"
         ]);
     }
+
+    public function getUserWebid()
+    {
+        $userid = request()->get("userid");
+        $web = UserWebModel::where("userid", $userid)->find();
+        if (empty($web)) {
+            return json([
+                'code' => 1,
+                'msg' => "该用户没有设置个性域名"
+            ]);
+        }
+        return json([
+            'code' => 0,
+            'msg' => '',
+            'data' => $web
+        ]);
+    }
 }

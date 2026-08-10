@@ -1184,10 +1184,10 @@ class  Manage extends BaseController
         if (!empty($payid)) {
             $where[] = ['payid', 'LIKE', "%" . $payid . "%"];
         }
-        $shopid = input("get.shopid") ? input("get.shopid") : "";
-        $shopid = trim($shopid);
-        if (!empty($shopid)) {
-            $where[] = ['shopid', '=', $shopid];
+        $userid = input("get.userid") ? input("get.userid") : "";
+        $userid = trim($userid);
+        if (!empty($userid)) {
+            $where[] = ['userid', '=', $userid];
         }
         $count = CheckOrderModel::where($where)->count();
         $products = CheckOrderModel::where($where)->order('create_time', 'desc')->limit($start, $limit)->select();

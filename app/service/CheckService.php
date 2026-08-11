@@ -1,4 +1,5 @@
 <?php
+
 namespace app\service;
 
 use app\model\CheckModel;
@@ -83,7 +84,7 @@ class CheckService
             }
             //计算利润
             $profit = $sell_price - $p_price;
-            $pprofit = $p_price - $data['total_price'];
+            $pprofit = $p_price - $data['total_price'] - $reward;
             $order->cost = $p_price;
             $order->unit_price = $product->price;
             $order->total_price = $sell_price;

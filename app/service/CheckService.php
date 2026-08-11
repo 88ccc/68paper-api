@@ -62,8 +62,10 @@ class CheckService
                 $p_price = $p_piece * $check->price;
             }
             //计算推荐奖励
-            $reward = $check->reward * $p_piece;
-
+            $reward = 0;
+            if ($order->tid > 0) {
+                $reward = $check->reward * $p_piece;
+            }
             //平台是否亏本
             if (($p_price - $reward) < $data['total_price']) {
                 Log::error("供货价低于成本价 id=" . $data['id']);

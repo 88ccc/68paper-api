@@ -2546,6 +2546,7 @@ class  Manage extends BaseController
         UserNoticeModel::where("userid", $userid)->delete();
         UserWebModel::where("userid", $userid)->delete();
         WithdrawModel::where("userid", $userid)->delete();
+        UserModel::where("tid", $userid)->update(["tid"=>0]);
         UserModel::where("id", $userid)->update(["name" => "", "email" => "#####", "mobile" => "#####", "status" => 3, "status_time" => date('Y-m-d H:i:s')]);
         return json([
             'code' => 0,

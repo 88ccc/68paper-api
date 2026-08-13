@@ -781,8 +781,8 @@ class PayService
         }
         $user->decreaseBalance($order->profit, 3, $order->id, '订单退款');
         UserModel::where("id", $order->userid)->dec('money', $order->profit)->update();
-        if (!empty($user->tid)) {
-            $tuser = UserModel::where('id', $user->tid)->find();
+        if (!empty($order->tid)) {
+            $tuser = UserModel::where('id', $order->tid)->find();
             if (!empty($tuser)) {
                 $tuser->decreaseBalance($order->tprofit, 3, $order->id, '订单退款-推荐奖励扣除(' . $user->id . ")");
                 UserModel::where("id", $order->tid)->dec('money', $order->tprofit)->update();

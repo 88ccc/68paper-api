@@ -1224,18 +1224,52 @@ class  Manage extends BaseController
                 'msg' => "该订单已经退款"
             ]);
         }
-        $ret  = (new PayService())->refund($order->payid);
-        if ($ret['code'] == 0) {
-            return json([
-                'code' => 0,
-                'msg' => "退款成功"
-            ]);
-        } else {
+        $payRecord = PayRecordModel::where("id", $order->payid)->find();
+        if (!empty($payRecord)) {
+            $ret  = (new PayService())->refund($order->payid);
+            if ($ret['code'] == 0) {
+                return json([
+                    'code' => 0,
+                    'msg' => "退款成功"
+                ]);
+            } else {
+                return json([
+                    'code' => 1,
+                    'msg' => $ret['msg']
+                ]);
+            }
+        }
+        //可能是检测卡支付，只需要退还成本即可
+        $card = CardModel::where("id", $order->payid)->find();
+        if (empty($card)) {
             return json([
                 'code' => 1,
-                'msg' => $ret['msg']
+                'msg' => "没有找到支付记录"
             ]);
         }
+
+        $order = CheckOrderModel::where(["id" => $orderid])->find();
+        $user = UserModel::where('id', $order->userid)->find();
+        if (empty($user)) {
+            return json([
+                'code' => 1,
+                'msg' => "检测卡支付，销售员不存在"
+            ]);
+        }
+        $user->increasePoints($order->cost, 3, $order->id, '订单退款');
+        CheckOrderModel::where(["id" => $orderid])->update(["status" => 9, "update_time" => date('Y-m-d H:i:s')]);
+        if (!empty($order->tid)) {
+            $tuser = UserModel::where("id", $order->tid)->find();
+            if (!empty($tuser)) {
+                $tuser->decreaseBalance($order->tprofit, 3, $order->id, '邀请奖励退款(销售:' . $order->userid . ')');
+                UserModel::where("id", $order->tid)->dec('money', $order->tprofit)->update();
+                UserModel::where("id", $order->userid)->dec('tmoney', $order->tprofit)->update();
+            }
+        }
+        return json([
+            'code' => 0,
+            'msg' => "退款成功"
+        ]);
     }
 
     public function homeData()
@@ -2546,7 +2580,7 @@ class  Manage extends BaseController
         UserNoticeModel::where("userid", $userid)->delete();
         UserWebModel::where("userid", $userid)->delete();
         WithdrawModel::where("userid", $userid)->delete();
-        UserModel::where("tid", $userid)->update(["tid"=>0]);
+        UserModel::where("tid", $userid)->update(["tid" => 0]);
         UserModel::where("id", $userid)->update(["name" => "", "email" => "#####", "mobile" => "#####", "status" => 3, "status_time" => date('Y-m-d H:i:s')]);
         return json([
             'code' => 0,

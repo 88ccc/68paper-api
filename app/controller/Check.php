@@ -7,7 +7,6 @@ use app\model\CardModel;
 use app\model\UserModel;
 use app\model\CheckModel;
 use app\model\CheckOrderModel;
-use app\model\PayModeModel;
 use app\model\PayRecordModel;
 use app\model\ProductTipsModel;
 use app\model\UserCheckModel;
@@ -359,7 +358,7 @@ class Check extends BaseController
             ]);
         } else {
             return json([
-                'code' => 0,
+                'code' => 1,
                 'msg' => "退款失败请联系客服"
             ]);
         }
@@ -504,7 +503,7 @@ class Check extends BaseController
                 'msg' => '已经支付，或者不能用检测卡支付'
             ]);
         }
-        $ret = (new CardService())->writeoffCards($userid, $cards, $orderid, $order->product_id, $order->piece);
+        $ret = (new CardService())->writeoffCards($userid, $cards, $orderid, $order->product_id, $order->piece,$order->cost);
         if ($ret['code'] != 0) {
             return json($ret);
         }
@@ -514,8 +513,8 @@ class Check extends BaseController
         $now = date('Y-m-d H:i:s');
         $spayid = $cards;
         CheckOrderModel::where("id", $orderid)->update(['status' => 4, 'payid' => $cards, 'spayid' => $spayid, 'pay_time' => $now, 'update_time' => $now]);
-        if (!empty($user->tid)) {
-            $tuser = UserModel::where("id", $user->tid)->find();
+        if (!empty($order->tid)) {
+            $tuser = UserModel::where("id", $order->tid)->find();
             if (!empty($tuser)) {
                 $tuser->increaseBalance($order->tprofit, 1, $order->id, '邀请奖励(销售:' . $order->userid . ')');
                 UserModel::where("id", $order->tid)->inc('money', $order->tprofit)->update();

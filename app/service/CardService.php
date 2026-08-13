@@ -7,8 +7,6 @@ use app\model\CheckModel;
 use app\model\UserCheckModel;
 use app\model\UserModel;
 use app\model\CardModel;
-use think\facade\Queue;
-use app\tool\QueueJob;
 
 class CardService
 {
@@ -113,7 +111,7 @@ class CardService
     }
 
     //消耗卡
-    public function writeoffCards(int $userid, string $cards, string $orderid, string $product_id, int $piece)
+    public function writeoffCards(int $userid, string $cards, string $orderid, string $product_id, int $piece,int $cost)
     {
         $cardarr = explode(",", $cards);
         $count  = 0; //计数
@@ -218,8 +216,6 @@ class CardService
                 'msg' => '用户状态异常'
             ];
         }
-        $price = $product->price;
-        $cost = bcmul($price, $piece, 0);
         if ($user->points < $cost) {
             return [
                 'code' => 10009,
@@ -256,7 +252,6 @@ class CardService
             'msg' => '核销成功',
             'data' => [
                 'userid' => $userid,
-                'unit_price' => $price,
                 'total_price' => $cost,
             ]
         ];

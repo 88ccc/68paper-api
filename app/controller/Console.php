@@ -736,7 +736,7 @@ class Console extends BaseController
         //今日订单数
         $data = CheckOrderModel::where([
             ['userid', '=', $userid],
-            ['status', '>', 3]
+            ['status', 'IN', [4, 5, 6, 7, 8, 10]]
         ])->whereDay('create_time')->field('count(id) as mun_count, SUM(total_price) as sales,SUM(profit) as myprofit')->select()
             ->toArray();
         $pay_count = 0;
@@ -1706,7 +1706,7 @@ class Console extends BaseController
                 'msg' => '用户不存在'
             ]);
         }
-        $apikey = getNonceStr(32);
+        $apikey = md5(uniqid("api", true));
         UserModel::where("id", $userid)->update(['apikey' => $apikey]);
 
         return json([

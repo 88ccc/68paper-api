@@ -102,11 +102,12 @@ class QcloudCosTool
         return $signedUrl;
     }
 
-    public function delete_dir(string $dir)
+    public function delete_dir(string $dir): void
     {
-        $cos_prefix = $dir; // 例如 "cos/folder"; 不得以/开头
+        // 删除该前缀下的所有对象，例如 "cos/folder"
+        // 统一规范为以 / 结尾，避免误删同前缀的其它文件（如 cos/folder2 下的对象）
+        $cos_prefix = rtrim($dir, '/') . '/';
         $nextMarker = '';
-        $cos_file_path = '';
         $isTruncated = true;
         while ($isTruncated) {
             try {
@@ -120,24 +121,32 @@ class QcloudCosTool
                         'MaxKeys' => 1000
                     ]
                 );
-                $isTruncated = $result['IsTruncated'];
-                $nextMarker = $result['NextMarker'];
-                foreach ($result['Contents'] as $content) {
+                // 目录不存在或为空时，响应中没有 Contents / IsTruncated / NextMarker 字段，需用默认值兜底
+                $isTruncated = $result['IsTruncated'] ?? false;
+                $contents = $result['Contents'] ?? [];
+                $lastKey = '';
+                foreach ($contents as $content) {
                     $cos_file_path = $content['Key'];
-                    //$local_file_path = $content['Key'];
-                    // 按照需求自定义拼接下载路径
+                    $lastKey = $cos_file_path;
                     try {
-                        $this->cosClient->deleteObject(array(
-                            'Bucket' => $this->bucket, //存储桶名称，由BucketName-Appid 组成，可以在COS控制台查看 https://console.cloud.tencent.com/cos5/bucket
+                        $this->cosClient->deleteObject([
+                            'Bucket' => $this->bucket,
                             'Key' => $cos_file_path,
-                        ));
-                        //echo ($cos_file_path . "\n");
+                        ]);
                     } catch (\Exception $e) {
-                        //echo ($e);
+                        // 单个对象删除失败，记录后继续删除其余对象
+                        Log::error("QcloudCos 删除对象失败: {$cos_file_path}");
                     }
                 }
+                // 注意：EncodingType=url 时接口不会返回 NextMarker，需用最后一个 Key 作为下一页 Marker
+                $nextMarker = $result['NextMarker'] ?? $lastKey;
+                if (empty($nextMarker) && $isTruncated) {
+                    Log::error('QcloudCos 分页无法获取 nextMarker，终止删除');
+                    break;
+                }
             } catch (\Exception $e) {
-                echo ($e);
+                Log::error('QcloudCos 列目录失败: ' . $e->getMessage());
+                break; // 出错时退出循环，避免死循环
             }
         }
     }

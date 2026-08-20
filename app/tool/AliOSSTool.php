@@ -74,25 +74,45 @@ class AliOSSTool
         }
         return $signedUrl;
     }
-    public function delete_dir(string $dir)
+    public function delete_dir(string $dir): void
     {
+        if ($this->ossClient == null) {
+            Log::error('ossClient is null');
+            return;
+        }
+        // 删除该前缀下的所有对象，例如 "folder"
+        // 统一规范为以 / 结尾，避免误删同前缀的其它对象（如 folder2 下的对象）
+        $prefix = rtrim($dir, '/') . '/';
         $paginator = new Oss\Paginator\ListObjectsV2Paginator(client: $this->ossClient);
         $iter = $paginator->iterPage(new Oss\Models\ListObjectsV2Request(
             bucket: $this->bucket,
-            prefix: $dir, // 设置前缀，用于筛选指定目录下的对象
-        )); // 初始化分页迭代器
+            prefix: $prefix, // 设置前缀，用于筛选指定目录下的对象
+        )); // 初始化分页迭代器，自动翻页直到遍历完所有对象
 
-        // 遍历对象分页结果
-        foreach ($iter as $page) {
-            foreach ($page->contents ?? [] as $object) {
-                // 打印每个对象的关键信息
-                // 输出对象的Key、类型和大小
-                print("Object: $object->key, $object->type, $object->size\n");
-                $request = new Oss\Models\DeleteObjectRequest(bucket: $this->ossClient, key: $object->key);
-
-                // 执行删除对象操作
-                $result = $this->ossClient->deleteObject($request);
+        try {
+            // 遍历对象分页结果
+            foreach ($iter as $page) {
+                $contents = $page->contents ?? [];
+                if (empty($contents)) {
+                    continue;
+                }
+                // 收集本页对象，批量删除（单次请求上限 1000 个，正好与每页数量对应）
+                $objects = [];
+                foreach ($contents as $object) {
+                    $objects[] = new Oss\Models\DeleteObject(key: $object->key);
+                }
+                $request = new Oss\Models\DeleteMultipleObjectsRequest(
+                    bucket: $this->bucket,
+                    objects: $objects,
+                    quiet: true, // 静默模式，失败时不逐个返回删除信息，减少响应体
+                );
+                $result = $this->ossClient->deleteMultipleObjects($request);
+                if ($result->statusCode != 200) {
+                    Log::error("ali oss deleteMultipleObjects fail statusCode = {$result->statusCode}, requestId = {$result->requestId}");
+                }
             }
+        } catch (\Exception $e) {
+            Log::error('ali oss 删除目录失败: ' . $e->getMessage());
         }
     }
 }

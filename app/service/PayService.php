@@ -328,6 +328,7 @@ class PayService
         if (isset($rarr['code'])) {
             if ($rarr['code'] == "10000") {
                 //退款成功
+                PayRecordModel::where("id", $payid)->update(['status' => 3, 'update_time' => date('Y-m-d H:i:s')]);
                 return [
                     'code' => 0,
                     'msg' => "退款成功"
@@ -532,6 +533,7 @@ class PayService
                 Log::debug("退款成功 " . $payid);
             }
         }
+        PayRecordModel::where("id", $payid)->update(['status' => 3, 'update_time' => date('Y-m-d H:i:s')]);
         return [
             'code' => 0,
             'msg' => "退款成功"

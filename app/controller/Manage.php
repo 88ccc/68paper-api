@@ -2604,4 +2604,83 @@ class  Manage extends BaseController
             'data' => $web
         ]);
     }
+
+    public function getBalanceData()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $userid = input("get.userid");
+        $business_no = input("get.bid");
+        $where = [];
+        if (!empty($userid)) {
+            $where['user_id'] = $userid;
+        }
+        if (!empty($business_no)) {
+            $where['business_no'] = $business_no;
+        }
+        $page = input("get.page") ? input("get.page") : 1;
+        $page = intval($page);
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = BalanceModel::where($where)->count();
+        $users = BalanceModel::where($where)->order('create_time', 'desc')->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $users;
+        return json($list);
+    }
+
+    public function getPointsData()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $userid = input("get.userid");
+        $business_no = input("get.bid");
+        $where = [];
+        if (!empty($userid)) {
+            $where['user_id'] = $userid;
+        }
+        if (!empty($business_no)) {
+            $where['business_no'] = $business_no;
+        }
+        $page = input("get.page") ? input("get.page") : 1;
+        $page = intval($page);
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = PointsModel::where($where)->count();
+        $users = PointsModel::where($where)->order('create_time', 'desc')->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $users;
+        return json($list);
+    }
+
+    public function getPayRecordData()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $userid = input("get.userid");
+        $payid = input("get.payid");
+        $scene = input("get.scene");
+        $where = [];
+        if (!empty($userid)) {
+            $where['userid'] = $userid;
+        }
+        if (!empty($payid)) {
+            $where['id'] = $payid;
+        }
+        if (!empty($scene)) {
+            $where['scene'] = $scene;
+        }
+        $page = input("get.page") ? input("get.page") : 1;
+        $page = intval($page);
+        $limit = input("get.limit") ? input("get.limit") : 1;
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $count = PayRecordModel::where($where)->count();
+        $users = PayRecordModel::where($where)->order('create_time', 'desc')->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $users;
+        return json($list);
+    }
 }

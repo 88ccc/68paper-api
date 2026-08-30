@@ -1185,7 +1185,7 @@ class Index extends BaseController
         $time = date("Y-m-d H:i:s", strtotime("-5 minute"));
         $orders = CheckOrderModel::where([
             ['status', 'in', [4, 6]]
-        ])->whereTime('update_time', '<', $time)->order('create_time', 'asc')->limit(0, 10)->select();
+        ])->whereTime('update_time', '<', $time)->order('create_time', 'asc')->limit(0, 50)->select();
         foreach ($orders as $order) {
             $check_data = [
                 "title" => $order->title,
@@ -1208,7 +1208,7 @@ class Index extends BaseController
         $time = date("Y-m-d H:i:s", strtotime("-10 minute"));
         $orders = CheckOrderModel::where([
             ['status', '=', 5]
-        ])->whereTime('update_time', '<', $time)->order('create_time', 'asc')->limit(0, 10)->select();
+        ])->whereTime('update_time', '<', $time)->order('create_time', 'asc')->limit(0, 50)->select();
         foreach ($orders as $order) {
             $ret = (new Check())->getOrderStatus($order->id);
             if ($ret['code'] == 0) {
@@ -1225,11 +1225,11 @@ class Index extends BaseController
 
         PayRecordModel::where(["status" => 0])->whereTime('create_time', '<', $time)->delete();
 
-        //超过1小时没有支付成功的订单应该按照失败处理
-        $time = date("Y-m-d H:i:s", strtotime("-60 minute"));
+        //长期支付失败
+        $time = date("Y-m-d H:i:s", strtotime("-40 minute"));
         $orders = CheckOrderModel::where([
-            ['status', '=', 4]
-        ])->whereTime('update_time', '<', $time)->order('create_time', 'asc')->limit(0, 10)->select();
+           ['status', 'in', [4, 6]]
+        ])->whereTime('pay_time', '<', $time)->order('create_time', 'asc')->limit(0, 50)->select();
         foreach ($orders as $order) {
             CheckOrderModel::where("id", $order->id)->update(['status' => 7, "remark" => "供货失败", 'update_time' => date('Y-m-d H:i:s')]);
         }

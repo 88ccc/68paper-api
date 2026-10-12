@@ -109,6 +109,9 @@ class CheckService
             }
             $order->status = 3;
             $order->update_time = date('Y-m-d H:i:s');
+            if (!empty($data['err_msg'])) {
+                $order->remark = $data['err_msg'];
+            }
             $order->save();
             return true;
         } else if ($data['status'] == 5) {
@@ -124,7 +127,11 @@ class CheckService
             return true;
         } else if ($data["status"] == 6) {
             //检测失败
-            CheckOrderModel::where('id', $data['id'])->update(['status' => 7, "update_time" => date("Y-m-d H:i:s")]);
+            if (!empty($data['err_msg'])) {
+                CheckOrderModel::where('id', $data['id'])->update(['status' => 7, "remark" => $data['err_msg'], "update_time" => date("Y-m-d H:i:s")]);
+            } else {
+                CheckOrderModel::where('id', $data['id'])->update(['status' => 7, "update_time" => date("Y-m-d H:i:s")]);
+            }
             return true;
         }
         return false;

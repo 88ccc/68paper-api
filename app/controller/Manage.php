@@ -28,6 +28,7 @@ use app\model\UserCheckModel;
 use app\model\UserWebModel;
 use app\service\PayService;
 use app\service\UpgradeService;
+use app\tool\AgisoTool;
 use think\facade\Config;
 use think\facade\Queue;
 use app\tool\QueueJob;
@@ -320,7 +321,28 @@ class  Manage extends BaseController
                 'msg' => '请填写配置'
             ]);
         }
+        $ret = (new AgisoTool())->getProviderInfo($config);
+        if($ret['code'] != 0){
+            return json([
+                'code' => 1,
+                'msg' => '出错了,请检查填写信息是否出错，或者稍后重试'
+            ]);
+        }
+        if(empty($ret['providerId'])){
+            //需要重试
+            $ret = (new AgisoTool())->getProviderInfo($config);
+        }
+        if(empty($ret['providerId'])){
+            //需要重试
+            return json([
+                'code' => 1,
+                'msg' => '出错了,请检查填写信息是否出错，或者稍后重试'
+            ]);
+        }
+        $config['providerId'] = $ret['providerId'];
+        $config['providerGuid'] = $ret['providerGuid'];
         ConfigService::set('91kaj', $config, '阿索奇标准货源');
+
         $msg = "设置成功";
         return json([
             'code' => 0,

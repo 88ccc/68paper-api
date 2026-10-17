@@ -9,8 +9,6 @@ namespace app\controller;
 use app\BaseController;
 use app\model\CardModel;
 use app\model\CheckModel;
-use app\model\ProductModel;
-use app\model\UserCheckModel;
 use app\model\UserModel;
 use app\service\CardService;
 use think\App;

@@ -32,7 +32,7 @@ class Index extends BaseController
     public function index()
     {
         $version = UpgradeService::codeVersion();
-        return '欢迎使用 '.$version;
+        return '欢迎使用 ' . $version;
     }
 
 
@@ -1230,7 +1230,7 @@ class Index extends BaseController
         //长期支付失败
         $time = date("Y-m-d H:i:s", strtotime("-40 minute"));
         $orders = CheckOrderModel::where([
-           ['status', 'in', [4, 6]]
+            ['status', 'in', [4, 6]]
         ])->whereTime('pay_time', '<', $time)->order('create_time', 'asc')->limit(0, 50)->select();
         foreach ($orders as $order) {
             CheckOrderModel::where("id", $order->id)->update(['status' => 7, "remark" => "供货失败", 'update_time' => date('Y-m-d H:i:s')]);
@@ -1273,5 +1273,28 @@ class Index extends BaseController
         (new StorageService())->clean_report();
         echo "Success";
         exit;
+    }
+
+    public function getAgisoproviderGuid()
+    {
+        $config = ConfigService::get("91kaj");
+        if (empty($config)) {
+            return json([
+                'code' => 10000,
+                'msg' => ''
+            ]);
+        } else {
+            $providerGuid = "";
+            if (!empty($config['providerGuid'])) {
+                $providerGuid = $config['providerGuid'];
+            }
+            return json([
+                'code' => 0,
+                'msg' => '',
+                'data' => [
+                    'providerGuid' => $providerGuid
+                ]
+            ]);
+        }
     }
 }

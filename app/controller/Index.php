@@ -23,6 +23,7 @@ use app\service\CheckService;
 use app\supplier\Check;
 use app\service\PayService;
 use app\service\StorageService;
+use app\service\UpgradeService;
 use think\facade\Cache;
 use think\facade\Config;
 
@@ -30,7 +31,8 @@ class Index extends BaseController
 {
     public function index()
     {
-        return '欢迎使用 V2.0.0';
+        $version = UpgradeService::codeVersion();
+        return '欢迎使用 '.$version;
     }
 
 

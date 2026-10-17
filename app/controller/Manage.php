@@ -27,6 +27,7 @@ use app\model\SmsModel;
 use app\model\UserCheckModel;
 use app\model\UserWebModel;
 use app\service\PayService;
+use app\service\UpgradeService;
 use think\facade\Config;
 use think\facade\Queue;
 use app\tool\QueueJob;
@@ -2682,5 +2683,71 @@ class  Manage extends BaseController
         $list["count"] = $count;
         $list["data"] = $users;
         return json($list);
+    }
+
+    /**
+     * 系统升级 - 概览
+     * 返回代码版本、数据库版本、以及待执行的迁移列表
+     */
+    public function upgradeInfo()
+    {
+        try {
+            return json([
+                'code' => 0,
+                'msg'  => '获取成功',
+                'data' => UpgradeService::info(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::write('upgrade', 'upgradeInfo error: ' . $e->getMessage());
+            return json([
+                'code' => 1,
+                'msg'  => '读取升级信息失败，请检查数据库连接：' . $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * 系统升级 - 执行
+     * post 参数：
+     *   backup  int  是否先自动备份数据库，默认 1（mysqldump 不可用时会自动跳过）
+     */
+    public function upgradeRun()
+    {
+        $needBackup = intval(input('post.backup', 1));
+
+        try {
+            $backupFile = null;
+            if ($needBackup === 1) {
+                $backupFile = UpgradeService::dump();
+            }
+
+            $result = UpgradeService::withLock(function (): array {
+                return UpgradeService::run(false, function (string $level, string $msg): void {
+                    Log::write('upgrade', $msg);
+                });
+            });
+
+            $failed = $result['fail'];
+            $msg = empty($failed)
+                ? sprintf('升级完成：执行 %d 个，跳过 %d 个', count($result['ok']), count($result['skip']))
+                : '升级中断：' . ($failed[0]['error'] ?? '未知错误');
+
+            return json([
+                'code' => empty($failed) ? 0 : 1,
+                'msg'  => $msg,
+                'data' => [
+                    'result'      => $result,
+                    'backup_file' => $backupFile,
+                    'db_version'  => UpgradeService::dbVersion(),
+                    'code_version' => UpgradeService::codeVersion(),
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::write('upgrade', 'upgradeRun error: ' . $e->getMessage());
+            return json([
+                'code' => 1,
+                'msg'  => $e->getMessage(),
+            ]);
+        }
     }
 }

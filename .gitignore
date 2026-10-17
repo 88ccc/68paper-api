@@ -1,5 +1,6 @@
 *.log
 .env
+.workbuddy/
 composer.phar
 composer.lock
 .DS_Store

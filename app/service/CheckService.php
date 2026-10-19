@@ -84,6 +84,15 @@ class CheckService
                 $order->save();
                 return true;
             }
+            //检查是否低于最低售价
+            if($product->price < $check->mini_price){
+                Log::error("产品售价低于最低售价 id=" . $data['id']);
+                $order->status = 3;
+                $order->remark = "低于最低售价";
+                $order->update_time = date('Y-m-d H:i:s');
+                $order->save();
+                return true;
+            }
             //计算利润
             $profit = $sell_price - $p_price;
             $pprofit = $p_price - $data['total_price'] - $reward;
@@ -226,6 +235,13 @@ class CheckService
                     'msg' => '标题不得包含中文'
                 ];
             }
+
+           if(mb_strlen($updata['title']) < 5){
+               return [
+                   'code' => 10001,
+                   'msg' => '标题不得少于5个字符'
+               ];
+           }
         }
 
 

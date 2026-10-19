@@ -711,7 +711,8 @@ class Console extends BaseController
         $count = CheckOrderModel::where(function ($query) use ($userid) {
             $query->whereOr([[
                 ['tid', '=', $userid],
-                ['status', '>', 4]
+                ['status', '>', 4],
+                ['tprofit', '>', 0]
             ], [
                 ['userid', '=', $userid]
             ]]);
@@ -719,7 +720,8 @@ class Console extends BaseController
         $products = CheckOrderModel::where(function ($query) use ($userid) {
             $query->whereOr([[
                 ['tid', '=', $userid],
-                ['status', '>', 4]
+                ['status', '>', 4],
+                ['tprofit', '>', 0]
             ], [
                 ['userid', '=', $userid]
             ]]);

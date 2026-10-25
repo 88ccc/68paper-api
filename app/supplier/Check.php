@@ -48,10 +48,10 @@ class Check
             'user_id'=>$config['userid'],
             'timestamp'=>time(),
             'product_id'=>$checkid,
-            'notify'=>$notify,
-            'url'=>$this->baseUrl . "upload_file",
+            'notify'=>$notify
         ];
         $sign = $this->generateSignature($params, $config['key']);
+        $params["url"] = $this->baseUrl . "upload_file";
         $params['sign'] = $sign;
         return $params;
 

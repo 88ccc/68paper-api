@@ -168,21 +168,19 @@ class CheckService
                 'msg' => '订单不存在'
             ];
         }
-        if (empty($data['title'])) {
+        $updata['title'] = trim($data['title']);
+        if (empty($updata['title'])) {
             return [
                 'code' => 10001,
                 'msg' => '标题不能为空'
             ];
-        } else {
-            $updata['title'] = trim($data['title']);
         }
-        if (empty($data['author'])) {
+        $updata['author'] = trim($data['author']);
+        if (empty($updata['author'])) {
             return [
                 'code' => 10001,
                 'msg' => '作者不能为空'
             ];
-        } else {
-            $updata['author'] = trim($data['author']);
         }
         if (($order->product_id == "wanfangzc") || ($order->product_id == "cqvipzc")) {
             if (empty($data['end_date'])) {

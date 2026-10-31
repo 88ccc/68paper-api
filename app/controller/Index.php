@@ -1297,4 +1297,13 @@ class Index extends BaseController
             ]);
         }
     }
+
+    public function get_take_time()
+    {
+
+        return json([
+            'code' => 1,
+            'msg' => '获取失败'
+        ]);
+    }
 }

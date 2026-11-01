@@ -503,7 +503,7 @@ class Check extends BaseController
                 'msg' => '已经支付，或者不能用检测卡支付'
             ]);
         }
-        $ret = (new CardService())->writeoffCards($userid, $cards, $orderid, $order->product_id, $order->piece,$order->cost);
+        $ret = (new CardService())->writeoffCards($userid, $cards, $orderid, $order->product_id, $order->piece, $order->cost);
         if ($ret['code'] != 0) {
             return json($ret);
         }
@@ -545,5 +545,12 @@ class Check extends BaseController
             'code' => 0,
             'msg' => '',
         ];
+    }
+    public function get_wpzp_class()
+    {
+        $pid = $this->request->get('pid');
+        $type = $this->request->get('type');
+        $ret = (new SupplierCheck())->get_wpzp_class($pid, $type);
+        return json($ret);
     }
 }

@@ -206,33 +206,8 @@ class CheckService
                     'msg' => '作者必须包含汉字或者字母'
                 ];
             }
-            // $pattern = '/[\\/:*?"<>|]/';
-            // if (preg_match($pattern, $updata['title']) == 1) {
-            //     return [
-            //         'code' => 10001,
-            //         'msg' => '标题不得包含\/:*?"<>|'
-            //     ];
-            // }
-            // if (preg_match($pattern, $updata['author']) == 1) {
-            //     return [
-            //         'code' => 10001,
-            //         'msg' => '作者不得包含\/:*?"<>|'
-            //     ];
-            // }
         }
         if (str_starts_with($order->product_id, 'turnitin')) {
-            if (preg_match('/[\x{4e00}-\x{9fff}]/u', $updata['author']) === 1) {
-                return [
-                    'code' => 10001,
-                    'msg' => '作者不得包含中文'
-                ];
-            }
-            if (preg_match('/[\x{4e00}-\x{9fff}]/u', $updata['title']) === 1) {
-                return [
-                    'code' => 10001,
-                    'msg' => '标题不得包含中文'
-                ];
-            }
 
             if (mb_strlen($updata['title']) < 5) {
                 return [
@@ -242,41 +217,17 @@ class CheckService
             }
         }
 
-
-        if ($order->product_id == "cqvipzpdxs") {
-            //维普智评大学生版
-            if (!empty($data['school_id'])) {
-                $param["school_id"] = trim($data['school_id']);
+        if (($order->product_id == "cqvipzpdxs") || ($order->product_id == "cqvipzpdxsys") || ($order->product_id == "cqvipzpyjs")) {
+            if (!empty($data['zptype'])) {
+                $param["zptype"] = trim($data['zptype']);
             }
-        }
-
-        if ($order->product_id == "cqvipzpyjs") {
-            if (!empty($data['school_id'])) {
-                $param["school_id"] = trim($data['school_id']);
-            } else {
+            if (empty($data['zpclass'])) {
                 return [
                     'code' => 10001,
-                    'msg' => '必须填写学校'
+                    'msg' => '维普智评学科不能为空'
                 ];
-            }
-
-            if (!empty($data['class_code'])) {
-                $param["class_code"] = trim($data['class_code']);
             } else {
-                return [
-                    'code' => 10001,
-                    'msg' => '必须填写学科'
-                ];
-            }
-        }
-        if ($order->product_id == "cqvipzpqk") {
-            if (!empty($data['class_type'])) {
-                $param["class_type"] = trim($data['class_type']);
-            } else {
-                return [
-                    'code' => 10001,
-                    'msg' => '必须填写类型'
-                ];
+                $param["zpclass"] = trim($data['zpclass']);
             }
         }
 

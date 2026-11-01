@@ -130,14 +130,8 @@ class Check
         if(!empty($data['end_date'])){
             $params['end_date'] = $data['end_date'];
         }
-        if(!empty($data['school_id'])){
-            $params['school_id'] = $data['school_id'];
-        }
-        if(!empty($data['class_code'])){
-            $params['class_code'] = $data['class_code'];
-        }
-        if(!empty($data['class_type'])){
-            $params['class_type'] = $data['class_type'];
+        if(!empty($data['zpclass'])){
+            $params['zpclass'] = $data['zpclass'];
         }
         if(!empty($data["ai_plat"])){
             $params['ai_plat'] = $data['ai_plat'];
@@ -194,6 +188,47 @@ class Check
         }
         return $result;
 
+    }
+
+    public function get_wpzp_class(int $pid, int $type)
+    {
+        $config = ConfigService::get("checkkey");
+        if (empty($config)) {
+            return [
+                'code' => 1,
+                'msg' => '还没有配置秘钥，请先配置秘钥'
+            ];
+        }
+
+        if (empty($config['userid'])) {
+            return [
+                'code' => 1,
+                'msg' => '配置错误'
+            ];
+        }
+        if (empty($config['key'])) {
+            return [
+                'code' => 1,
+                'msg' => '还没有配置秘钥，请先配置秘钥'
+            ];
+        }
+        $params = [
+            'user_id' => $config['userid'],
+            'timestamp' => time(),
+            'vid'=>$pid,
+            'type'=>$type,
+        ];
+        $sign = $this->generateSignature($params, $config['key']);
+        $params['sign'] = $sign;
+        $result = $this->httpPostFormUrlencoded($params, $this->baseUrl . "get_wpzp_class");
+        if (isset($result['error_msg'])) {
+            Log::write($result);
+            return [
+                'code' => 1,
+                'msg' => '系统错误',
+            ];
+        }
+        return $result;
     }
 
     //获取余额

@@ -322,17 +322,17 @@ class  Manage extends BaseController
             ]);
         }
         $ret = (new AgisoTool())->getProviderInfo($config);
-        if($ret['code'] != 0){
+        if ($ret['code'] != 0) {
             return json([
                 'code' => 1,
                 'msg' => '出错了,请检查填写信息是否出错，或者稍后重试'
             ]);
         }
-        if(empty($ret['providerId'])){
+        if (empty($ret['providerId'])) {
             //需要重试
             $ret = (new AgisoTool())->getProviderInfo($config);
         }
-        if(empty($ret['providerId'])){
+        if (empty($ret['providerId'])) {
             //需要重试
             return json([
                 'code' => 1,
@@ -2769,6 +2769,44 @@ class  Manage extends BaseController
             return json([
                 'code' => 1,
                 'msg'  => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function setDefaultAid()
+    {
+        if (Config::get('website.is_test')) {
+            return json([
+                'code' => 1,
+                'msg' => '演示网站不准设置'
+            ]);
+        }
+        $config = $this->request->param('aid');
+        $aid = intval($config);
+        if (empty($aid)) {
+            ConfigService::clear('default_aid');
+        }
+        ConfigService::set('default_aid', $aid, '默认用户');
+        return json([
+            'code' => 0,
+            'msg' => '设置成功'
+        ]);
+    }
+
+    public function getDefaultAid()
+    {
+
+        $config = ConfigService::get("default_aid");
+        if (empty($config)) {
+            return json([
+                'code' => 10000,
+                'msg' => '请先配置缓存信息'
+            ]);
+        } else {
+            return json([
+                'code' => 0,
+                'msg' => '',
+                'data' => $config
             ]);
         }
     }

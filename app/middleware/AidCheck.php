@@ -3,6 +3,8 @@
 namespace app\middleware;
 use app\model\UserModel;
 use app\model\UserWebModel;
+use app\service\ConfigService;
+use think\facade\Log;
 
 
 class AidCheck
@@ -27,14 +29,21 @@ class AidCheck
             ], 401);
         }
         $userweb = UserWebModel::where('webid', $aid)->find();
+        $userid = 0;
         if(empty($userweb)){
+            $default_aid = ConfigService::get("default_aid");
+            $userid = $default_aid;
+        }else{
+            $userid = $userweb->userid;
+        }
+        if(empty($userid)){
             return json([
                 'code' => 1001,
                 'msg' => '不能找到商家'
             ], 401);
         }
 
-        $user = UserModel::where('id', $userweb->userid)->find();
+        $user = UserModel::where('id', $userid)->find();
 
         if (empty($user)) {
             return json([

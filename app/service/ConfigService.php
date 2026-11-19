@@ -9,7 +9,7 @@ use think\facade\Log;
 class ConfigService
 {
     // 获取单个配置
-    public static function get($key)
+    public static function get(string $key):mixed
     {
         // 从缓存读取
         $value = Cache::get($key);
@@ -34,12 +34,12 @@ class ConfigService
         return $value;
     }
 
-    public static function clear($key){
+    public static function clear(string $key){
         Cache::delete($key);
         ConfigModel::where('key', $key)->delete();
     }
 
-    public static function set($key, $value, $title = null)
+    public static function set(string $key, mixed $value, $title = null)
     {
 
         $config = ConfigModel::where('key', $key)->find();

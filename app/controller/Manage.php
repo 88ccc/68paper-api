@@ -2810,4 +2810,51 @@ class  Manage extends BaseController
             ]);
         }
     }
+
+    public function getAbnormalUser()
+    {
+        $list["code"] = 0;
+        $list["msg"] = "";
+        $months = input("post.months");
+        $balancel = input("post.balancel");
+        $balanceh = input("post.balanceh");
+        $pointsl = input("post.pointsl");
+        $pointsh = input("post.pointsh");
+        $name = input("post.name");
+        $where = [];
+        if (!empty($months)) {
+            $date = new \DateTime();
+            $date->modify('-' . $months . ' months');
+            $monthAgo = $date->format('Y-m-d H:i:s');
+            $where[] = ['logintime', '<', $monthAgo];
+        }
+        if (!empty($balancel)) {
+            $where[] = ['balance', '<', $balancel];
+        }
+        if (!empty($balanceh)) {
+            $where[] = ['balance', '>', $balanceh];
+        }
+        if (!empty($pointsl)) {
+            $where[] = ['points', '<', $pointsl];
+        }
+        if (!empty($pointsh)) {
+            $where[] = ['points', '>', $pointsh];
+        }
+        $page = input("post.page") ? input("post.page") : 1;
+        $page = intval($page);
+        $limit = input("post.limit") ? input("post.limit") : 1;
+        $limit = intval($limit);
+        $start = $limit * ($page - 1);
+        $query = UserModel::where($where);
+        if (!empty($name)) {
+            $query->where(function ($q) {
+                $q->where('name', 'null', '')->whereOr('name', '=', '');
+            });
+        }
+        $count = (clone $query)->count();
+        $users = $query->limit($start, $limit)->select();
+        $list["count"] = $count;
+        $list["data"] = $users;
+        return json($list);
+    }
 }
